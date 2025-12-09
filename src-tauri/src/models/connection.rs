@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use chrono::{DateTime, Utc};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Connection {
     pub id: String,                    // UUID v4
     pub name: String,                  // Nom affiché
@@ -39,6 +40,7 @@ pub enum ConnectionConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SslConfig {
     pub enabled: bool,
     pub mode: SslMode,                 // Disable | Prefer | Require | VerifyCA | VerifyFull
