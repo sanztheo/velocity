@@ -31,7 +31,7 @@ import { toast } from "sonner";
 
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  dbType: z.enum(["SQLite", "PostgreSQL", "MySQL", "MariaDB", "SQLServer"]),
+  dbType: z.enum(["SQLite", "PostgreSQL", "MySQL", "MariaDB", "CockroachDB", "Redshift", "SQLServer", "Redis"]),
   host: z.string().optional(),
   port: z.string().optional(),
   database: z.string().optional(),
@@ -41,6 +41,11 @@ const formSchema = z.object({
   url: z.string().optional(),
   ssl: z.boolean().default(false),
   favorite: z.boolean().default(false),
+  // SQL Server specific
+  encrypt: z.boolean().default(false),
+  trustServerCertificate: z.boolean().default(true),
+  // Redis specific
+  useTls: z.boolean().default(false),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -66,6 +71,10 @@ function parseConnectionUrl(url: string): Partial<FormValues> | null {
         mysql: "MySQL",
         mariadb: "MariaDB",
         sqlite: "SQLite",
+        cockroachdb: "CockroachDB",
+        redshift: "Redshift",
+        redis: "Redis",
+        rediss: "Redis",
       };
       return {
         dbType: dbTypeMap[protocol.toLowerCase()] || "PostgreSQL",
@@ -278,9 +287,12 @@ export function ConnectionForm({ connection, onSuccess, onCancel }: ConnectionFo
                     <SelectContent>
                       <SelectItem value="PostgreSQL">PostgreSQL</SelectItem>
                       <SelectItem value="MySQL">MySQL</SelectItem>
-                      <SelectItem value="SQLite">SQLite</SelectItem>
                       <SelectItem value="MariaDB">MariaDB</SelectItem>
+                      <SelectItem value="SQLite">SQLite</SelectItem>
+                      <SelectItem value="CockroachDB">CockroachDB</SelectItem>
+                      <SelectItem value="Redshift">Redshift</SelectItem>
                       <SelectItem value="SQLServer">SQL Server</SelectItem>
+                      <SelectItem value="Redis">Redis</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />

@@ -1,4 +1,12 @@
-export type DatabaseType = 'SQLite' | 'PostgreSQL' | 'MySQL' | 'MariaDB' | 'SQLServer';
+export type DatabaseType = 
+  | 'SQLite' 
+  | 'PostgreSQL' 
+  | 'MySQL' 
+  | 'MariaDB' 
+  | 'CockroachDB'
+  | 'Redshift'
+  | 'SQLServer'
+  | 'Redis';
 
 export interface SslConfig {
   enabled: boolean;
@@ -17,6 +25,11 @@ export interface ConnectionConfig {
   password?: string;
   ssl?: SslConfig;
   path?: string; // For SQLite
+  // SQL Server specific
+  encrypt?: boolean;
+  trustServerCertificate?: boolean;
+  // Redis specific
+  useTls?: boolean;
 }
 
 export interface Connection {
@@ -37,8 +50,6 @@ export interface Tab {
   connectionId: string;
   type: TabType;
   title: string;
-  // State specific to query tab
   sql?: string;
-  // State specific to table/structure tab
   tableName?: string;
 }
