@@ -22,7 +22,7 @@
 | Multi-connexions simultanées  | ✅        | ✅     | Pool manager          |
 | Multi-onglets/fenêtres        | ✅        | ✅     | Tab system            |
 | SSL/TLS                       | ✅        | ✅     | Config par connexion  |
-| SSH Tunnel                    | ✅        | 🔄     | Placeholder impl      |
+| SSH Tunnel                    | ✅        | ✅     | russh crate           |
 | Persistence connexions (JSON) | ✅        | ✅     | AppData config        |
 | Keychain/Credential Manager   | ✅        | ✅     | tauri-plugin-keyring  |
 

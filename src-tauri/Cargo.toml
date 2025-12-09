@@ -34,10 +34,9 @@ tokio-util = { version = "0.7", features = ["compat"] }
 redis = { version = "0.24", features = ["tokio-comp", "connection-manager"] }
 # Keychain/Credential Manager
 tauri-plugin-keyring = "0.1"
-# SSH Tunnel support (placeholder - full implementation pending)
-# russh = "0.44"
-# russh-keys = "0.44"
-# ssh-key = "0.6"
-# async-trait = "0.1"
+# SSH Tunnel support
+russh = "0.44"
+russh-keys = "0.44"
+async-trait = "0.1"
 
 
