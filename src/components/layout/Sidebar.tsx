@@ -49,13 +49,13 @@ export function Sidebar() {
   };
 
   return (
-    <div className="flex bg-sidebar h-full w-full flex-col border-r border-sidebar-border">
+    <div className="flex h-full w-full flex-col bg-sidebar border-r border-sidebar-border">
        <div className="p-4 border-b border-sidebar-border flex items-center justify-between">
         <span className="font-semibold text-sm text-sidebar-foreground">Connections</span>
         <Button 
           variant="ghost" 
           size="icon" 
-          className="h-4 w-4"
+          className="h-6 w-6 text-sidebar-foreground hover:text-sidebar-active-foreground hover:bg-sidebar-hover"
           onClick={() => setIsAddModalOpen(true)}
         >
           <Plus className="h-4 w-4" />
@@ -73,8 +73,8 @@ export function Sidebar() {
             <div 
               key={conn.id} 
               className={cn(
-                "group flex items-center justify-between text-sm p-2 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded cursor-pointer transition-colors",
-                activeConnectionId === conn.id && "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                "group flex items-center justify-between text-sm p-2 rounded cursor-pointer transition-colors text-sidebar-foreground hover:bg-sidebar-hover hover:text-sidebar-active-foreground",
+                activeConnectionId === conn.id && "bg-sidebar-active text-sidebar-active-foreground font-medium"
               )}
               onClick={() => setActiveConnection(conn.id)}
             >

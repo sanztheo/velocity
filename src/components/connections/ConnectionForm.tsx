@@ -23,7 +23,9 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DialogFooter } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useConnections } from "@/hooks/useConnections";
+import { Link2, Settings2 } from "lucide-react";
 
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -34,6 +36,7 @@ const formSchema = z.object({
   username: z.string().optional(),
   password: z.string().optional(),
   path: z.string().optional(),
+  url: z.string().optional(),
   ssl: z.boolean().default(false),
   favorite: z.boolean().default(false),
 });
@@ -46,9 +49,41 @@ interface ConnectionFormProps {
   onCancel: () => void;
 }
 
+// Parse connection URL into components
+function parseConnectionUrl(url: string): Partial<FormValues> | null {
+  try {
+    // Handle different URL formats
+    // postgresql://user:password@host:port/database
+    // mysql://user:password@host:port/database
+    const match = url.match(/^(\w+):\/\/(?:([^:]+):([^@]+)@)?([^:\/]+)(?::(\d+))?\/(.+)$/);
+    if (match) {
+      const [, protocol, user, pass, host, port, database] = match;
+      const dbTypeMap: Record<string, DatabaseType> = {
+        postgresql: "PostgreSQL",
+        postgres: "PostgreSQL",
+        mysql: "MySQL",
+        mariadb: "MariaDB",
+        sqlite: "SQLite",
+      };
+      return {
+        dbType: dbTypeMap[protocol.toLowerCase()] || "PostgreSQL",
+        username: user || "",
+        password: pass || "",
+        host: host || "localhost",
+        port: port || "5432",
+        database: database || "",
+      };
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 export function ConnectionForm({ connection, onSuccess, onCancel }: ConnectionFormProps) {
   const { save } = useConnections();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [inputMode, setInputMode] = useState<"manual" | "url">("manual");
 
   const form = useForm<any>({
     resolver: zodResolver(formSchema),
@@ -61,6 +96,7 @@ export function ConnectionForm({ connection, onSuccess, onCancel }: ConnectionFo
       username: "",
       password: "",
       path: "",
+      url: "",
       ssl: false,
       favorite: false,
     },
@@ -78,6 +114,7 @@ export function ConnectionForm({ connection, onSuccess, onCancel }: ConnectionFo
         username: connection.config.username || "",
         password: connection.config.password || "",
         path: connection.config.path || "",
+        url: "",
         ssl: connection.config.ssl?.enabled || false,
         favorite: connection.favorite,
       });
@@ -91,6 +128,7 @@ export function ConnectionForm({ connection, onSuccess, onCancel }: ConnectionFo
         username: "",
         password: "",
         path: "",
+        url: "",
         ssl: false,
         favorite: false,
       });
@@ -98,6 +136,25 @@ export function ConnectionForm({ connection, onSuccess, onCancel }: ConnectionFo
   }, [connection, form]);
 
   const dbType = form.watch("dbType");
+  const urlValue = form.watch("url");
+
+  // Parse URL when it changes
+  useEffect(() => {
+    if (inputMode === "url" && urlValue) {
+      const parsed = parseConnectionUrl(urlValue);
+      if (parsed) {
+        Object.entries(parsed).forEach(([key, value]) => {
+          if (value !== undefined) {
+            form.setValue(key as any, value);
+          }
+        });
+        // Auto-set name from database if empty
+        if (!form.getValues("name") && parsed.database) {
+          form.setValue("name", parsed.database);
+        }
+      }
+    }
+  }, [urlValue, inputMode, form]);
 
   async function onSubmit(data: any) {
     const values = data as FormValues;
@@ -143,158 +200,235 @@ export function ConnectionForm({ connection, onSuccess, onCancel }: ConnectionFo
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <FormField
-            control={form.control as any}
-            name="name"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Connection Name</FormLabel>
-                <FormControl>
-                  <Input placeholder="My Production DB" {...field} value={field.value || ''} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control as any}
-            name="dbType"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Database Type</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="PostgreSQL">PostgreSQL</SelectItem>
-                    <SelectItem value="MySQL">MySQL</SelectItem>
-                    <SelectItem value="SQLite">SQLite</SelectItem>
-                    <SelectItem value="MariaDB">MariaDB</SelectItem>
-                    <SelectItem value="SQLServer">SQL Server</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
+        {/* Connection Name - Always visible */}
+        <FormField
+          control={form.control as any}
+          name="name"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Connection Name</FormLabel>
+              <FormControl>
+                <Input 
+                  placeholder="My Production DB" 
+                  {...field} 
+                  value={field.value || ''} 
+                  className="bg-secondary border-border"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-        {dbType === "SQLite" ? (
-          <FormField
-            control={form.control as any}
-            name="path"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Database Path</FormLabel>
-                <FormControl>
-                  <Input placeholder="/path/to/database.db" {...field} value={field.value || ''} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        ) : (
-          <>
-            <div className="grid grid-cols-3 gap-4">
-              <FormField
-                control={form.control as any}
-                name="host"
-                render={({ field }) => (
-                  <FormItem className="col-span-2">
-                    <FormLabel>Host</FormLabel>
-                    <FormControl>
-                      <Input placeholder="localhost" {...field} value={field.value || ''} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control as any}
-                name="port"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Port</FormLabel>
-                    <FormControl>
-                      <Input placeholder="5432" {...field} value={field.value || ''} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-            
+        {/* Input Mode Tabs */}
+        <Tabs value={inputMode} onValueChange={(v) => setInputMode(v as "manual" | "url")}>
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="manual" className="flex items-center gap-2">
+              <Settings2 className="h-4 w-4" />
+              Manual
+            </TabsTrigger>
+            <TabsTrigger value="url" className="flex items-center gap-2">
+              <Link2 className="h-4 w-4" />
+              URL
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="url" className="space-y-4 mt-4">
             <FormField
               control={form.control as any}
-              name="database"
+              name="url"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Database Name</FormLabel>
+                  <FormLabel>Connection URL</FormLabel>
                   <FormControl>
-                    <Input placeholder="my_db" {...field} value={field.value || ''} />
+                    <Input 
+                      placeholder="postgresql://user:password@localhost:5432/database"
+                      {...field}
+                      value={field.value || ''}
+                      className="bg-secondary border-border font-mono text-sm"
+                    />
                   </FormControl>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Paste your database connection URL and we'll parse it automatically
+                  </p>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </TabsContent>
+
+          <TabsContent value="manual" className="space-y-4 mt-4">
+            {/* Database Type */}
+            <FormField
+              control={form.control as any}
+              name="dbType"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Database Type</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger className="bg-secondary border-border">
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="PostgreSQL">PostgreSQL</SelectItem>
+                      <SelectItem value="MySQL">MySQL</SelectItem>
+                      <SelectItem value="SQLite">SQLite</SelectItem>
+                      <SelectItem value="MariaDB">MariaDB</SelectItem>
+                      <SelectItem value="SQLServer">SQL Server</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
+            {dbType === "SQLite" ? (
               <FormField
                 control={form.control as any}
-                name="username"
+                name="path"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Username</FormLabel>
+                    <FormLabel>Database Path</FormLabel>
                     <FormControl>
-                      <Input placeholder="postgres" {...field} value={field.value || ''} />
+                      <Input 
+                        placeholder="/path/to/database.db" 
+                        {...field} 
+                        value={field.value || ''} 
+                        className="bg-secondary border-border"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control as any}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Password</FormLabel>
-                    <FormControl>
-                      <Input type="password" placeholder="•••••••" {...field} value={field.value || ''} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-            
-             <FormField
-              control={form.control as any}
-              name="ssl"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                  <FormControl>
-                    <Checkbox
-                      checked={!!field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                  </FormControl>
-                  <div className="space-y-1 leading-none">
-                    <FormLabel>
-                      Enable SSL
-                    </FormLabel>
-                  </div>
-                </FormItem>
-              )}
-            />
-          </>
-        )}
+            ) : (
+              <>
+                <div className="grid grid-cols-3 gap-4">
+                  <FormField
+                    control={form.control as any}
+                    name="host"
+                    render={({ field }) => (
+                      <FormItem className="col-span-2">
+                        <FormLabel>Host</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="localhost" 
+                            {...field} 
+                            value={field.value || ''} 
+                            className="bg-secondary border-border"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control as any}
+                    name="port"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Port</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="5432" 
+                            {...field} 
+                            value={field.value || ''} 
+                            className="bg-secondary border-border"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                
+                <FormField
+                  control={form.control as any}
+                  name="database"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Database Name</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="my_db" 
+                          {...field} 
+                          value={field.value || ''} 
+                          className="bg-secondary border-border"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control as any}
+                    name="username"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Username</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="postgres" 
+                            {...field} 
+                            value={field.value || ''} 
+                            className="bg-secondary border-border"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control as any}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Password</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="password" 
+                            placeholder="•••••••" 
+                            {...field} 
+                            value={field.value || ''} 
+                            className="bg-secondary border-border"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                
+                <FormField
+                  control={form.control as any}
+                  name="ssl"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border border-border p-4 bg-secondary/50">
+                      <FormControl>
+                        <Checkbox
+                          checked={!!field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel>Enable SSL</FormLabel>
+                      </div>
+                    </FormItem>
+                  )}
+                />
+              </>
+            )}
+          </TabsContent>
+        </Tabs>
         
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
+        <DialogFooter className="pt-4">
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Cancel
+          </Button>
           <Button type="submit" disabled={isSubmitting || save.isPending}>
             {save.isPending ? "Saving..." : "Save Connection"}
           </Button>
