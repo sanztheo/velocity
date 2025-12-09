@@ -1,15 +1,13 @@
-use tauri::State;
-use std::sync::Arc;
-use crate::db::{ConnectionPoolManager, ColumnInfo, TableData};
+use crate::db::{ColumnInfo, ConnectionPoolManager, TableData};
 use crate::error::VelocityError;
 use crate::models::connection::Connection;
 use crate::store::connections::ConnectionsStore;
+use std::sync::Arc;
+use tauri::State;
 
 /// Test a database connection
 #[tauri::command]
-pub async fn test_connection(
-    conn: Connection,
-) -> Result<String, VelocityError> {
+pub async fn test_connection(conn: Connection) -> Result<String, VelocityError> {
     ConnectionPoolManager::test_connection(&conn).await?;
     Ok("Connection successful!".to_string())
 }
@@ -26,7 +24,7 @@ pub async fn connect(
         .into_iter()
         .find(|c| c.id == id)
         .ok_or_else(|| VelocityError::NotFound("Connection not found".to_string()))?;
-    
+
     pool_manager.connect(&connection).await
 }
 
@@ -73,7 +71,9 @@ pub async fn get_table_schema(
     table_name: String,
     pool_manager: State<'_, Arc<ConnectionPoolManager>>,
 ) -> Result<Vec<ColumnInfo>, VelocityError> {
-    pool_manager.get_table_schema(&connection_id, &table_name).await
+    pool_manager
+        .get_table_schema(&connection_id, &table_name)
+        .await
 }
 
 /// Get table data with pagination
@@ -85,6 +85,42 @@ pub async fn get_table_data(
     offset: i32,
     pool_manager: State<'_, Arc<ConnectionPoolManager>>,
 ) -> Result<TableData, VelocityError> {
-    pool_manager.get_table_data(&connection_id, &table_name, limit, offset).await
+    pool_manager
+        .get_table_data(&connection_id, &table_name, limit, offset)
+        .await
 }
 
+/// A pending change to be executed
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PendingChange {
+    pub row_id: String,
+    pub column: String,
+    pub old_value: serde_json::Value,
+    pub new_value: serde_json::Value,
+    #[serde(rename = "type")]
+    pub change_type: String, // "update", "insert", "delete"
+}
+
+/// Result of executing changes
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExecuteResult {
+    pub success: bool,
+    pub rows_affected: i64,
+    pub errors: Vec<String>,
+}
+
+/// Execute pending changes (INSERT, UPDATE, DELETE)
+#[tauri::command]
+pub async fn execute_changes(
+    connection_id: String,
+    table_name: String,
+    changes: Vec<PendingChange>,
+    primary_key_column: String,
+    pool_manager: State<'_, Arc<ConnectionPoolManager>>,
+) -> Result<ExecuteResult, VelocityError> {
+    pool_manager
+        .execute_changes(&connection_id, &table_name, &primary_key_column, changes)
+        .await
+}

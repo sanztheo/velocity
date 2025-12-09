@@ -41,17 +41,17 @@
 
 #### ✏️ Édition de Données
 
-| Fonctionnalité                 | TablePlus | Status | Notes          |
-| ------------------------------ | --------- | ------ | -------------- |
-| Vue grille (spreadsheet)       | ✅        | ✅     | TanStack Table |
-| Édition inline cellules        | ✅        | ❌     |                |
-| Ajout de lignes                | ✅        | ❌     |                |
-| Suppression de lignes          | ✅        | ❌     |                |
-| Commit explicite (Cmd+S)       | ✅        | ❌     |                |
-| Rollback/Annuler changements   | ✅        | ❌     |                |
-| Aperçu SQL généré              | ✅        | ❌     | Modal preview  |
-| Couleurs pour types de données | ✅        | ❌     |                |
-| NULL handling visuel           | ✅        | ✅     | Badge spécial  |
+| Fonctionnalité                 | TablePlus | Status | Notes               |
+| ------------------------------ | --------- | ------ | ------------------- |
+| Vue grille (spreadsheet)       | ✅        | ✅     | TanStack Virtual    |
+| Édition inline cellules        | ✅        | ✅     | Double-click        |
+| Ajout de lignes                | ✅        | ✅     | Bouton + Row        |
+| Suppression de lignes          | ✅        | ✅     | Delete icon         |
+| Commit explicite (Cmd+S)       | ✅        | ✅     | Modal + transaction |
+| Rollback/Annuler changements   | ✅        | ✅     | Escape / Discard    |
+| Aperçu SQL généré              | ✅        | ✅     | SqlPreviewModal     |
+| Couleurs pour types de données | ✅        | ✅     | EditableCell        |
+| NULL handling visuel           | ✅        | ✅     | Italic + muted      |
 
 #### 🖥️ Éditeur SQL
 
@@ -140,16 +140,16 @@
 
 | Catégorie       | ✅ Fait | 🔄 En cours | ❌ À faire |
 | --------------- | ------- | ----------- | ---------- |
-| Connexions      | 13      | 1           | 1          |
+| Connexions      | 14      | 0           | 1          |
 | Navigation      | 4       | 0           | 4          |
-| Édition Données | 2       | 0           | 7          |
+| Édition Données | 9       | 0           | 0          |
 | Éditeur SQL     | 0       | 1           | 11         |
 | Filtrage        | 1       | 0           | 8          |
 | Structure       | 1       | 0           | 6          |
 | Import/Export   | 0       | 0           | 7          |
 | Sécurité        | 1       | 0           | 5          |
 | UX              | 8       | 1           | 3          |
-| **TOTAL**       | **30**  | **3**       | **52**     |
+| **TOTAL**       | **38**  | **2**       | **45**     |
 
 ### 6.3 Fonctionnalités Velocity Uniques (différenciation)
 

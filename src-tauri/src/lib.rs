@@ -1,19 +1,19 @@
-pub mod models;
-pub mod store;
-pub mod error;
 pub mod commands;
 pub mod db;
+pub mod error;
+pub mod models;
 pub mod ssh;
+pub mod store;
 
-use std::sync::Arc;
-use tauri::Manager;
 use commands::connections::*;
 use commands::database::*;
 use commands::keychain::*;
 use commands::ssh::*;
 use db::ConnectionPoolManager;
 use ssh::tunnel::SshTunnelManager;
+use std::sync::Arc;
 use store::connections::ConnectionsStore;
+use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -45,6 +45,7 @@ pub fn run() {
             list_tables,
             get_table_schema,
             get_table_data,
+            execute_changes,
             // Keychain operations
             save_password,
             get_password,
@@ -57,5 +58,3 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
-
-

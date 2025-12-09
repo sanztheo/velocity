@@ -66,4 +66,31 @@ export async function getTableData(
   return await invoke("get_table_data", { connectionId, tableName, limit, offset });
 }
 
+// Data editing
+export interface PendingChange {
+  rowId: string;
+  column: string;
+  oldValue: unknown;
+  newValue: unknown;
+  type: 'update' | 'insert' | 'delete';
+}
 
+export interface ExecuteResult {
+  success: boolean;
+  rowsAffected: number;
+  errors: string[];
+}
+
+export async function executeChanges(
+  connectionId: string,
+  tableName: string,
+  changes: PendingChange[],
+  primaryKeyColumn: string
+): Promise<ExecuteResult> {
+  return await invoke("execute_changes", { 
+    connectionId, 
+    tableName, 
+    changes, 
+    primaryKeyColumn 
+  });
+}
