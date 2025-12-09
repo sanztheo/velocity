@@ -1,0 +1,267 @@
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use sqlx::{Pool, Postgres, MySql, Sqlite};
+use crate::error::VelocityError;
+use crate::models::connection::{Connection, ConnectionConfig, DatabaseType};
+
+/// Enum to hold different database pool types
+pub enum DatabasePool {
+    Postgres(Pool<Postgres>),
+    MySQL(Pool<MySql>),
+    SQLite(Pool<Sqlite>),
+}
+
+/// Global connection pool manager
+pub struct ConnectionPoolManager {
+    pools: RwLock<HashMap<String, Arc<DatabasePool>>>,
+}
+
+impl ConnectionPoolManager {
+    pub fn new() -> Self {
+        Self {
+            pools: RwLock::new(HashMap::new()),
+        }
+    }
+
+    /// Test a connection without storing it
+    pub async fn test_connection(connection: &Connection) -> Result<(), VelocityError> {
+        match &connection.config {
+            ConnectionConfig::PostgreSQL { host, port, database, username, password, .. } => {
+                let url = format!(
+                    "postgres://{}:{}@{}:{}/{}",
+                    username,
+                    password.as_deref().unwrap_or(""),
+                    host,
+                    port,
+                    database
+                );
+                
+                let pool = sqlx::postgres::PgPoolOptions::new()
+                    .max_connections(1)
+                    .acquire_timeout(std::time::Duration::from_secs(5))
+                    .connect(&url)
+                    .await
+                    .map_err(|e| VelocityError::Connection(e.to_string()))?;
+                
+                // Test with a simple query
+                sqlx::query("SELECT 1")
+                    .execute(&pool)
+                    .await
+                    .map_err(|e| VelocityError::Query(e.to_string()))?;
+                
+                pool.close().await;
+                Ok(())
+            }
+            ConnectionConfig::MySQL { host, port, database, username, password, .. } => {
+                let url = format!(
+                    "mysql://{}:{}@{}:{}/{}",
+                    username,
+                    password.as_deref().unwrap_or(""),
+                    host,
+                    port,
+                    database
+                );
+                
+                let pool = sqlx::mysql::MySqlPoolOptions::new()
+                    .max_connections(1)
+                    .acquire_timeout(std::time::Duration::from_secs(5))
+                    .connect(&url)
+                    .await
+                    .map_err(|e| VelocityError::Connection(e.to_string()))?;
+                
+                sqlx::query("SELECT 1")
+                    .execute(&pool)
+                    .await
+                    .map_err(|e| VelocityError::Query(e.to_string()))?;
+                
+                pool.close().await;
+                Ok(())
+            }
+            ConnectionConfig::SQLite { path } => {
+                let url = format!("sqlite:{}", path.display());
+                
+                let pool = sqlx::sqlite::SqlitePoolOptions::new()
+                    .max_connections(1)
+                    .acquire_timeout(std::time::Duration::from_secs(5))
+                    .connect(&url)
+                    .await
+                    .map_err(|e| VelocityError::Connection(e.to_string()))?;
+                
+                sqlx::query("SELECT 1")
+                    .execute(&pool)
+                    .await
+                    .map_err(|e| VelocityError::Query(e.to_string()))?;
+                
+                pool.close().await;
+                Ok(())
+            }
+        }
+    }
+
+    /// Connect and store the pool
+    pub async fn connect(&self, connection: &Connection) -> Result<(), VelocityError> {
+        let pool = match &connection.config {
+            ConnectionConfig::PostgreSQL { host, port, database, username, password, .. } => {
+                let url = format!(
+                    "postgres://{}:{}@{}:{}/{}",
+                    username,
+                    password.as_deref().unwrap_or(""),
+                    host,
+                    port,
+                    database
+                );
+                
+                let pool = sqlx::postgres::PgPoolOptions::new()
+                    .max_connections(5)
+                    .acquire_timeout(std::time::Duration::from_secs(10))
+                    .connect(&url)
+                    .await
+                    .map_err(|e| VelocityError::Connection(e.to_string()))?;
+                
+                DatabasePool::Postgres(pool)
+            }
+            ConnectionConfig::MySQL { host, port, database, username, password, .. } => {
+                let url = format!(
+                    "mysql://{}:{}@{}:{}/{}",
+                    username,
+                    password.as_deref().unwrap_or(""),
+                    host,
+                    port,
+                    database
+                );
+                
+                let pool = sqlx::mysql::MySqlPoolOptions::new()
+                    .max_connections(5)
+                    .acquire_timeout(std::time::Duration::from_secs(10))
+                    .connect(&url)
+                    .await
+                    .map_err(|e| VelocityError::Connection(e.to_string()))?;
+                
+                DatabasePool::MySQL(pool)
+            }
+            ConnectionConfig::SQLite { path } => {
+                let url = format!("sqlite:{}", path.display());
+                
+                let pool = sqlx::sqlite::SqlitePoolOptions::new()
+                    .max_connections(5)
+                    .acquire_timeout(std::time::Duration::from_secs(10))
+                    .connect(&url)
+                    .await
+                    .map_err(|e| VelocityError::Connection(e.to_string()))?;
+                
+                DatabasePool::SQLite(pool)
+            }
+        };
+
+        let mut pools = self.pools.write().await;
+        pools.insert(connection.id.clone(), Arc::new(pool));
+        Ok(())
+    }
+
+    /// Disconnect and remove the pool
+    pub async fn disconnect(&self, connection_id: &str) -> Result<(), VelocityError> {
+        let mut pools = self.pools.write().await;
+        if let Some(pool) = pools.remove(connection_id) {
+            match Arc::try_unwrap(pool) {
+                Ok(p) => {
+                    match p {
+                        DatabasePool::Postgres(pool) => pool.close().await,
+                        DatabasePool::MySQL(pool) => pool.close().await,
+                        DatabasePool::SQLite(pool) => pool.close().await,
+                    }
+                }
+                Err(_) => {
+                    // Pool is still in use somewhere
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Check if a connection is active
+    pub async fn is_connected(&self, connection_id: &str) -> bool {
+        let pools = self.pools.read().await;
+        pools.contains_key(connection_id)
+    }
+
+    /// Get pool for a connection
+    pub async fn get_pool(&self, connection_id: &str) -> Option<Arc<DatabasePool>> {
+        let pools = self.pools.read().await;
+        pools.get(connection_id).cloned()
+    }
+
+    /// List databases for a connection
+    pub async fn list_databases(&self, connection_id: &str) -> Result<Vec<String>, VelocityError> {
+        let pool = self.get_pool(connection_id).await
+            .ok_or_else(|| VelocityError::Connection("Not connected".to_string()))?;
+
+        match pool.as_ref() {
+            DatabasePool::Postgres(pool) => {
+                let rows: Vec<(String,)> = sqlx::query_as(
+                    "SELECT datname FROM pg_database WHERE datistemplate = false ORDER BY datname"
+                )
+                .fetch_all(pool)
+                .await
+                .map_err(|e| VelocityError::Query(e.to_string()))?;
+                
+                Ok(rows.into_iter().map(|r| r.0).collect())
+            }
+            DatabasePool::MySQL(pool) => {
+                let rows: Vec<(String,)> = sqlx::query_as("SHOW DATABASES")
+                    .fetch_all(pool)
+                    .await
+                    .map_err(|e| VelocityError::Query(e.to_string()))?;
+                
+                Ok(rows.into_iter().map(|r| r.0).collect())
+            }
+            DatabasePool::SQLite(_) => {
+                // SQLite doesn't have multiple databases
+                Ok(vec!["main".to_string()])
+            }
+        }
+    }
+
+    /// List tables for a connection
+    pub async fn list_tables(&self, connection_id: &str) -> Result<Vec<String>, VelocityError> {
+        let pool = self.get_pool(connection_id).await
+            .ok_or_else(|| VelocityError::Connection("Not connected".to_string()))?;
+
+        match pool.as_ref() {
+            DatabasePool::Postgres(pool) => {
+                let rows: Vec<(String,)> = sqlx::query_as(
+                    "SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename"
+                )
+                .fetch_all(pool)
+                .await
+                .map_err(|e| VelocityError::Query(e.to_string()))?;
+                
+                Ok(rows.into_iter().map(|r| r.0).collect())
+            }
+            DatabasePool::MySQL(pool) => {
+                let rows: Vec<(String,)> = sqlx::query_as("SHOW TABLES")
+                    .fetch_all(pool)
+                    .await
+                    .map_err(|e| VelocityError::Query(e.to_string()))?;
+                
+                Ok(rows.into_iter().map(|r| r.0).collect())
+            }
+            DatabasePool::SQLite(pool) => {
+                let rows: Vec<(String,)> = sqlx::query_as(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+                )
+                .fetch_all(pool)
+                .await
+                .map_err(|e| VelocityError::Query(e.to_string()))?;
+                
+                Ok(rows.into_iter().map(|r| r.0).collect())
+            }
+        }
+    }
+}
+
+impl Default for ConnectionPoolManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}

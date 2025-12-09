@@ -5,14 +5,23 @@ pub enum VelocityError {
     #[error("Connection failed: {0}")]
     ConnectionError(String),
     
+    #[error("Connection failed: {0}")]
+    Connection(String),
+    
     #[error("Query error: {0}")]
     QueryError(String),
+    
+    #[error("Query error: {0}")]
+    Query(String),
     
     #[error("Timeout after {0}ms")]
     Timeout(u64),
     
     #[error("Connection not found: {0}")]
     ConnectionNotFound(String),
+    
+    #[error("Not found: {0}")]
+    NotFound(String),
     
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),

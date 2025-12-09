@@ -22,6 +22,7 @@ interface AppState {
   setActiveConnection: (id: string | null) => void;
   
   openTab: (tab: Omit<Tab, 'id'>) => void;
+  addTab: (tab: Tab) => void;
   closeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
   updateTabSql: (id: string, sql: string) => void;
@@ -61,6 +62,18 @@ export const useAppStore = create<AppState>((set) => ({
     return {
       tabs: [...state.tabs, newTab],
       activeTabId: newTab.id
+    };
+  }),
+  
+  addTab: (tab) => set((state) => {
+    // Check if tab already exists
+    const exists = state.tabs.some(t => t.id === tab.id);
+    if (exists) {
+      return { activeTabId: tab.id };
+    }
+    return {
+      tabs: [...state.tabs, tab],
+      activeTabId: tab.id
     };
   }),
   

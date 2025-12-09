@@ -25,7 +25,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useConnections } from "@/hooks/useConnections";
-import { Link2, Settings2 } from "lucide-react";
+import { testConnection } from "@/lib/tauri";
+import { Link2, Settings2, Zap, CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -83,6 +85,8 @@ function parseConnectionUrl(url: string): Partial<FormValues> | null {
 export function ConnectionForm({ connection, onSuccess, onCancel }: ConnectionFormProps) {
   const { save } = useConnections();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
+  const [testResult, setTestResult] = useState<"success" | "error" | null>(null);
   const [inputMode, setInputMode] = useState<"manual" | "url">("manual");
 
   const form = useForm<any>({
@@ -425,13 +429,70 @@ export function ConnectionForm({ connection, onSuccess, onCancel }: ConnectionFo
           </TabsContent>
         </Tabs>
         
-        <DialogFooter className="pt-4">
-          <Button type="button" variant="outline" onClick={onCancel}>
-            Cancel
+        <DialogFooter className="pt-4 flex justify-between">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={async () => {
+              setIsTesting(true);
+              setTestResult(null);
+              try {
+                const values = form.getValues();
+                const config: ConnectionConfig = { type: values.dbType as DatabaseType };
+                
+                if (values.dbType === "SQLite") {
+                  config.path = values.path;
+                } else {
+                  config.host = values.host;
+                  config.port = parseInt(values.port || "5432", 10);
+                  config.database = values.database;
+                  config.username = values.username;
+                  config.password = values.password || undefined;
+                  config.ssl = { enabled: values.ssl, mode: values.ssl ? "Require" : "Disable" };
+                }
+                
+                const testConn: Connection = {
+                  id: "test",
+                  name: values.name || "Test",
+                  dbType: values.dbType as DatabaseType,
+                  config,
+                  favorite: false,
+                  createdAt: new Date().toISOString(),
+                };
+                
+                await testConnection(testConn);
+                setTestResult("success");
+                toast.success("Connection successful!");
+              } catch (error) {
+                setTestResult("error");
+                toast.error(`Connection failed: ${error}`);
+              } finally {
+                setIsTesting(false);
+              }
+            }}
+            disabled={isTesting}
+            className="flex items-center gap-2"
+          >
+            {isTesting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : testResult === "success" ? (
+              <CheckCircle className="h-4 w-4 text-green-500" />
+            ) : testResult === "error" ? (
+              <XCircle className="h-4 w-4 text-red-500" />
+            ) : (
+              <Zap className="h-4 w-4" />
+            )}
+            Test Connection
           </Button>
-          <Button type="submit" disabled={isSubmitting || save.isPending}>
-            {save.isPending ? "Saving..." : "Save Connection"}
-          </Button>
+          
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" onClick={onCancel}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting || save.isPending}>
+              {save.isPending ? "Saving..." : "Save Connection"}
+            </Button>
+          </div>
         </DialogFooter>
       </form>
     </Form>

@@ -10,16 +10,16 @@
 
 | Fonctionnalité                | TablePlus | Status | Notes                 |
 | ----------------------------- | --------- | ------ | --------------------- |
-| MySQL                         | ✅        | ❌     | Via sqlx              |
-| PostgreSQL                    | ✅        | ❌     | Via sqlx              |
-| SQLite                        | ✅        | ❌     | Via sqlx              |
+| MySQL                         | ✅        | ✅     | Via sqlx              |
+| PostgreSQL                    | ✅        | ✅     | Via sqlx              |
+| SQLite                        | ✅        | ✅     | Via sqlx              |
 | MariaDB                       | ✅        | ❌     | Même driver MySQL     |
 | Microsoft SQL Server          | ✅        | ❌     | tiberius crate        |
 | Redis                         | ✅        | ❌     | redis-rs crate        |
 | CockroachDB                   | ✅        | ❌     | Compatible PostgreSQL |
 | Redshift                      | ✅        | ❌     | Compatible PostgreSQL |
 | Vertica                       | ✅        | ❌     | ODBC driver           |
-| Multi-connexions simultanées  | ✅        | 🔄     | Pool manager          |
+| Multi-connexions simultanées  | ✅        | ✅     | Pool manager          |
 | Multi-onglets/fenêtres        | ✅        | ✅     | Tab system            |
 | SSL/TLS                       | ✅        | ✅     | Config par connexion  |
 | SSH Tunnel                    | ✅        | ❌     | russh crate           |
@@ -30,8 +30,8 @@
 
 | Fonctionnalité                   | TablePlus | Status | Notes           |
 | -------------------------------- | --------- | ------ | --------------- |
-| Liste databases                  | ✅        | ❌     |                 |
-| Liste tables                     | ✅        | ❌     |                 |
+| Liste databases                  | ✅        | ✅     |                 |
+| Liste tables                     | ✅        | ✅     |                 |
 | Liste vues                       | ✅        | ❌     |                 |
 | Liste fonctions                  | ✅        | ❌     |                 |
 | Liste colonnes/indexes           | ✅        | ❌     | Schema explorer |

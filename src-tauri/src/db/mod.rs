@@ -1,1 +1,3 @@
-// Module for database operations
+pub mod pool;
+
+pub use pool::ConnectionPoolManager;
