@@ -10,20 +10,20 @@ pub enum DatabasePool {
     Postgres(Pool<Postgres>),
     MySQL(Pool<MySql>),
     SQLite(Pool<Sqlite>),
-    // SQL Server uses a different connection type
+    // SQL Server uses a different connection type - config for lazy connect
     SQLServer(SqlServerPool),
-    // Redis uses its own client
+    // Redis client
     Redis(RedisPool),
 }
 
 /// SQL Server connection wrapper
 pub struct SqlServerPool {
-    config: tiberius::Config,
+    pub config: tiberius::Config,
 }
 
 /// Redis connection wrapper  
 pub struct RedisPool {
-    client: redis::Client,
+    pub client: redis::Client,
 }
 
 /// Global connection pool manager
@@ -48,9 +48,7 @@ impl ConnectionPoolManager {
                     "postgres://{}:{}@{}:{}/{}",
                     username,
                     password.as_deref().unwrap_or(""),
-                    host,
-                    port,
-                    database
+                    host, port, database
                 );
                 
                 let pool = sqlx::postgres::PgPoolOptions::new()
@@ -60,9 +58,7 @@ impl ConnectionPoolManager {
                     .await
                     .map_err(|e| VelocityError::Connection(e.to_string()))?;
                 
-                sqlx::query("SELECT 1")
-                    .execute(&pool)
-                    .await
+                sqlx::query("SELECT 1").execute(&pool).await
                     .map_err(|e| VelocityError::Query(e.to_string()))?;
                 
                 pool.close().await;
@@ -74,9 +70,7 @@ impl ConnectionPoolManager {
                     "mysql://{}:{}@{}:{}/{}",
                     username,
                     password.as_deref().unwrap_or(""),
-                    host,
-                    port,
-                    database
+                    host, port, database
                 );
                 
                 let pool = sqlx::mysql::MySqlPoolOptions::new()
@@ -86,9 +80,7 @@ impl ConnectionPoolManager {
                     .await
                     .map_err(|e| VelocityError::Connection(e.to_string()))?;
                 
-                sqlx::query("SELECT 1")
-                    .execute(&pool)
-                    .await
+                sqlx::query("SELECT 1").execute(&pool).await
                     .map_err(|e| VelocityError::Query(e.to_string()))?;
                 
                 pool.close().await;
@@ -104,9 +96,7 @@ impl ConnectionPoolManager {
                     .await
                     .map_err(|e| VelocityError::Connection(e.to_string()))?;
                 
-                sqlx::query("SELECT 1")
-                    .execute(&pool)
-                    .await
+                sqlx::query("SELECT 1").execute(&pool).await
                     .map_err(|e| VelocityError::Query(e.to_string()))?;
                 
                 pool.close().await;
@@ -141,39 +131,28 @@ impl ConnectionPoolManager {
                     .await
                     .map_err(|e| VelocityError::Connection(e.to_string()))?;
                 
-                // Test query
-                client.simple_query("SELECT 1")
-                    .await
+                client.simple_query("SELECT 1").await
                     .map_err(|e| VelocityError::Query(e.to_string()))?;
                 
                 Ok(())
             }
             ConnectionConfig::Redis { host, port, password, database, use_tls } => {
-                let url = if let Some(pwd) = password {
-                    if *use_tls {
-                        format!("rediss://:{}@{}:{}/{}", pwd, host, port, database)
-                    } else {
-                        format!("redis://:{}@{}:{}/{}", pwd, host, port, database)
-                    }
-                } else {
-                    if *use_tls {
-                        format!("rediss://{}:{}/{}", host, port, database)
-                    } else {
-                        format!("redis://{}:{}/{}", host, port, database)
-                    }
+                use redis::AsyncCommands;
+                
+                let url = match (password, use_tls) {
+                    (Some(pwd), true) => format!("rediss://:{}@{}:{}/{}", pwd, host, port, database),
+                    (Some(pwd), false) => format!("redis://:{}@{}:{}/{}", pwd, host, port, database),
+                    (None, true) => format!("rediss://{}:{}/{}", host, port, database),
+                    (None, false) => format!("redis://{}:{}/{}", host, port, database),
                 };
                 
                 let client = redis::Client::open(url)
                     .map_err(|e| VelocityError::Connection(e.to_string()))?;
                 
-                let mut conn = client.get_multiplexed_async_connection()
-                    .await
+                let mut conn = client.get_multiplexed_async_connection().await
                     .map_err(|e| VelocityError::Connection(e.to_string()))?;
                 
-                // Test with PING
-                redis::cmd("PING")
-                    .query_async::<String>(&mut conn)
-                    .await
+                let _: String = redis::cmd("PING").query_async(&mut conn).await
                     .map_err(|e| VelocityError::Connection(e.to_string()))?;
                 
                 Ok(())
@@ -191,9 +170,7 @@ impl ConnectionPoolManager {
                     "postgres://{}:{}@{}:{}/{}",
                     username,
                     password.as_deref().unwrap_or(""),
-                    host,
-                    port,
-                    database
+                    host, port, database
                 );
                 
                 let pool = sqlx::postgres::PgPoolOptions::new()
@@ -211,9 +188,7 @@ impl ConnectionPoolManager {
                     "mysql://{}:{}@{}:{}/{}",
                     username,
                     password.as_deref().unwrap_or(""),
-                    host,
-                    port,
-                    database
+                    host, port, database
                 );
                 
                 let pool = sqlx::mysql::MySqlPoolOptions::new()
@@ -244,31 +219,19 @@ impl ConnectionPoolManager {
                 config.database(database);
                 config.authentication(tiberius::AuthMethod::sql_server(username, password.as_deref().unwrap_or("")));
                 
-                if *encrypt {
-                    config.encryption(tiberius::EncryptionLevel::Required);
-                } else {
-                    config.encryption(tiberius::EncryptionLevel::NotSupported);
-                }
+                if *encrypt { config.encryption(tiberius::EncryptionLevel::Required); }
+                else { config.encryption(tiberius::EncryptionLevel::NotSupported); }
                 
-                if *trust_server_certificate {
-                    config.trust_cert();
-                }
+                if *trust_server_certificate { config.trust_cert(); }
                 
                 DatabasePool::SQLServer(SqlServerPool { config })
             }
             ConnectionConfig::Redis { host, port, password, database, use_tls } => {
-                let url = if let Some(pwd) = password {
-                    if *use_tls {
-                        format!("rediss://:{}@{}:{}/{}", pwd, host, port, database)
-                    } else {
-                        format!("redis://:{}@{}:{}/{}", pwd, host, port, database)
-                    }
-                } else {
-                    if *use_tls {
-                        format!("rediss://{}:{}/{}", host, port, database)
-                    } else {
-                        format!("redis://{}:{}/{}", host, port, database)
-                    }
+                let url = match (password, use_tls) {
+                    (Some(pwd), true) => format!("rediss://:{}@{}:{}/{}", pwd, host, port, database),
+                    (Some(pwd), false) => format!("redis://:{}@{}:{}/{}", pwd, host, port, database),
+                    (None, true) => format!("rediss://{}:{}/{}", host, port, database),
+                    (None, false) => format!("redis://{}:{}/{}", host, port, database),
                 };
                 
                 let client = redis::Client::open(url)
@@ -287,35 +250,27 @@ impl ConnectionPoolManager {
     pub async fn disconnect(&self, connection_id: &str) -> Result<(), VelocityError> {
         let mut pools = self.pools.write().await;
         if let Some(pool) = pools.remove(connection_id) {
-            match Arc::try_unwrap(pool) {
-                Ok(p) => {
-                    match p {
-                        DatabasePool::Postgres(pool) => pool.close().await,
-                        DatabasePool::MySQL(pool) => pool.close().await,
-                        DatabasePool::SQLite(pool) => pool.close().await,
-                        DatabasePool::SQLServer(_) => {}, // No explicit close needed
-                        DatabasePool::Redis(_) => {}, // No explicit close needed
-                    }
+            if let Ok(p) = Arc::try_unwrap(pool) {
+                match p {
+                    DatabasePool::Postgres(pool) => pool.close().await,
+                    DatabasePool::MySQL(pool) => pool.close().await,
+                    DatabasePool::SQLite(pool) => pool.close().await,
+                    DatabasePool::SQLServer(_) => {},
+                    DatabasePool::Redis(_) => {},
                 }
-                Err(_) => {}
             }
         }
         Ok(())
     }
 
-    /// Check if a connection is active
     pub async fn is_connected(&self, connection_id: &str) -> bool {
-        let pools = self.pools.read().await;
-        pools.contains_key(connection_id)
+        self.pools.read().await.contains_key(connection_id)
     }
 
-    /// Get pool for a connection
     pub async fn get_pool(&self, connection_id: &str) -> Option<Arc<DatabasePool>> {
-        let pools = self.pools.read().await;
-        pools.get(connection_id).cloned()
+        self.pools.read().await.get(connection_id).cloned()
     }
 
-    /// List databases for a connection
     pub async fn list_databases(&self, connection_id: &str) -> Result<Vec<String>, VelocityError> {
         let pool = self.get_pool(connection_id).await
             .ok_or_else(|| VelocityError::Connection("Not connected".to_string()))?;
@@ -324,36 +279,20 @@ impl ConnectionPoolManager {
             DatabasePool::Postgres(pool) => {
                 let rows: Vec<(String,)> = sqlx::query_as(
                     "SELECT datname FROM pg_database WHERE datistemplate = false ORDER BY datname"
-                )
-                .fetch_all(pool)
-                .await
-                .map_err(|e| VelocityError::Query(e.to_string()))?;
-                
+                ).fetch_all(pool).await.map_err(|e| VelocityError::Query(e.to_string()))?;
                 Ok(rows.into_iter().map(|r| r.0).collect())
             }
             DatabasePool::MySQL(pool) => {
                 let rows: Vec<(String,)> = sqlx::query_as("SHOW DATABASES")
-                    .fetch_all(pool)
-                    .await
-                    .map_err(|e| VelocityError::Query(e.to_string()))?;
-                
+                    .fetch_all(pool).await.map_err(|e| VelocityError::Query(e.to_string()))?;
                 Ok(rows.into_iter().map(|r| r.0).collect())
             }
-            DatabasePool::SQLite(_) => {
-                Ok(vec!["main".to_string()])
-            }
-            DatabasePool::SQLServer(_) => {
-                // Would need to execute query via tiberius
-                Ok(vec!["master".to_string()])
-            }
-            DatabasePool::Redis(_) => {
-                // Redis has 16 databases (0-15)
-                Ok((0..16).map(|i| format!("db{}", i)).collect())
-            }
+            DatabasePool::SQLite(_) => Ok(vec!["main".to_string()]),
+            DatabasePool::SQLServer(_) => Ok(vec!["master".to_string()]),
+            DatabasePool::Redis(_) => Ok((0..16).map(|i| format!("db{}", i)).collect()),
         }
     }
 
-    /// List tables for a connection
     pub async fn list_tables(&self, connection_id: &str) -> Result<Vec<String>, VelocityError> {
         let pool = self.get_pool(connection_id).await
             .ok_or_else(|| VelocityError::Connection("Not connected".to_string()))?;
@@ -362,53 +301,31 @@ impl ConnectionPoolManager {
             DatabasePool::Postgres(pool) => {
                 let rows: Vec<(String,)> = sqlx::query_as(
                     "SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename"
-                )
-                .fetch_all(pool)
-                .await
-                .map_err(|e| VelocityError::Query(e.to_string()))?;
-                
+                ).fetch_all(pool).await.map_err(|e| VelocityError::Query(e.to_string()))?;
                 Ok(rows.into_iter().map(|r| r.0).collect())
             }
             DatabasePool::MySQL(pool) => {
                 let rows: Vec<(String,)> = sqlx::query_as("SHOW TABLES")
-                    .fetch_all(pool)
-                    .await
-                    .map_err(|e| VelocityError::Query(e.to_string()))?;
-                
+                    .fetch_all(pool).await.map_err(|e| VelocityError::Query(e.to_string()))?;
                 Ok(rows.into_iter().map(|r| r.0).collect())
             }
             DatabasePool::SQLite(pool) => {
                 let rows: Vec<(String,)> = sqlx::query_as(
                     "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
-                )
-                .fetch_all(pool)
-                .await
-                .map_err(|e| VelocityError::Query(e.to_string()))?;
-                
+                ).fetch_all(pool).await.map_err(|e| VelocityError::Query(e.to_string()))?;
                 Ok(rows.into_iter().map(|r| r.0).collect())
             }
-            DatabasePool::SQLServer(_) => {
-                // Would need tiberius query
-                Ok(vec![])
-            }
+            DatabasePool::SQLServer(_) => Ok(vec![]),
             DatabasePool::Redis(redis_pool) => {
-                // Redis uses KEYS command instead of tables
-                let mut conn = redis_pool.client.get_multiplexed_async_connection()
-                    .await
+                let mut conn = redis_pool.client.get_multiplexed_async_connection().await
                     .map_err(|e| VelocityError::Connection(e.to_string()))?;
-                
-                let keys: Vec<String> = redis::cmd("KEYS")
-                    .arg("*")
-                    .query_async(&mut conn)
-                    .await
+                let keys: Vec<String> = redis::cmd("KEYS").arg("*").query_async(&mut conn).await
                     .map_err(|e| VelocityError::Query(e.to_string()))?;
-                
                 Ok(keys)
             }
         }
     }
 
-    /// Get table schema (columns info)
     pub async fn get_table_schema(&self, connection_id: &str, table_name: &str) -> Result<Vec<ColumnInfo>, VelocityError> {
         let pool = self.get_pool(connection_id).await
             .ok_or_else(|| VelocityError::Connection("Not connected".to_string()))?;
@@ -416,227 +333,100 @@ impl ConnectionPoolManager {
         match pool.as_ref() {
             DatabasePool::Postgres(pool) => {
                 let rows: Vec<(String, String, String, Option<i32>)> = sqlx::query_as(
-                    r#"
-                    SELECT 
-                        column_name,
-                        data_type,
-                        CASE WHEN is_nullable = 'YES' THEN 'YES' ELSE 'NO' END,
-                        character_maximum_length
-                    FROM information_schema.columns 
-                    WHERE table_name = $1 AND table_schema = 'public'
-                    ORDER BY ordinal_position
-                    "#
-                )
-                .bind(table_name)
-                .fetch_all(pool)
-                .await
-                .map_err(|e| VelocityError::Query(e.to_string()))?;
+                    r#"SELECT column_name, data_type, CASE WHEN is_nullable = 'YES' THEN 'YES' ELSE 'NO' END, character_maximum_length
+                    FROM information_schema.columns WHERE table_name = $1 AND table_schema = 'public' ORDER BY ordinal_position"#
+                ).bind(table_name).fetch_all(pool).await.map_err(|e| VelocityError::Query(e.to_string()))?;
                 
                 Ok(rows.into_iter().map(|(name, data_type, nullable, max_length)| {
-                    ColumnInfo {
-                        name,
-                        data_type,
-                        nullable: nullable == "YES",
-                        max_length,
-                        is_primary_key: false,
-                    }
+                    ColumnInfo { name, data_type, nullable: nullable == "YES", max_length, is_primary_key: false }
                 }).collect())
             }
             DatabasePool::MySQL(pool) => {
                 let rows: Vec<(String, String, String, Option<i64>)> = sqlx::query_as(
-                    r#"
-                    SELECT 
-                        COLUMN_NAME,
-                        DATA_TYPE,
-                        IS_NULLABLE,
-                        CHARACTER_MAXIMUM_LENGTH
-                    FROM INFORMATION_SCHEMA.COLUMNS 
-                    WHERE TABLE_NAME = ?
-                    ORDER BY ORDINAL_POSITION
-                    "#
-                )
-                .bind(table_name)
-                .fetch_all(pool)
-                .await
-                .map_err(|e| VelocityError::Query(e.to_string()))?;
+                    r#"SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, CHARACTER_MAXIMUM_LENGTH
+                    FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = ? ORDER BY ORDINAL_POSITION"#
+                ).bind(table_name).fetch_all(pool).await.map_err(|e| VelocityError::Query(e.to_string()))?;
                 
                 Ok(rows.into_iter().map(|(name, data_type, nullable, max_length)| {
-                    ColumnInfo {
-                        name,
-                        data_type,
-                        nullable: nullable == "YES",
-                        max_length: max_length.map(|l| l as i32),
-                        is_primary_key: false,
-                    }
+                    ColumnInfo { name, data_type, nullable: nullable == "YES", max_length: max_length.map(|l| l as i32), is_primary_key: false }
                 }).collect())
             }
             DatabasePool::SQLite(pool) => {
-                let rows: Vec<(String, String, i32)> = sqlx::query_as(
+                let rows: Vec<(i32, String, String, i32, Option<String>, i32)> = sqlx::query_as(
                     &format!("PRAGMA table_info({})", table_name)
-                )
-                .fetch_all(pool)
-                .await
-                .map_err(|e| VelocityError::Query(e.to_string()))?;
+                ).fetch_all(pool).await.map_err(|e| VelocityError::Query(e.to_string()))?;
                 
-                Ok(rows.into_iter().map(|(name, data_type, notnull)| {
-                    ColumnInfo {
-                        name,
-                        data_type,
-                        nullable: notnull == 0,
-                        max_length: None,
-                        is_primary_key: false,
-                    }
+                Ok(rows.into_iter().map(|(_, name, data_type, notnull, _, pk)| {
+                    ColumnInfo { name, data_type, nullable: notnull == 0, max_length: None, is_primary_key: pk == 1 }
                 }).collect())
             }
-            DatabasePool::SQLServer(_) => {
-                // Would need tiberius implementation
-                Ok(vec![])
-            }
-            DatabasePool::Redis(_) => {
-                // Redis doesn't have schemas - return key type
-                Ok(vec![ColumnInfo {
-                    name: "value".to_string(),
-                    data_type: "string".to_string(),
-                    nullable: true,
-                    max_length: None,
-                    is_primary_key: false,
-                }])
-            }
+            DatabasePool::SQLServer(_) => Ok(vec![]),
+            DatabasePool::Redis(_) => Ok(vec![ColumnInfo { name: "value".into(), data_type: "string".into(), nullable: true, max_length: None, is_primary_key: false }]),
         }
     }
 
-    /// Get table data with pagination
-    pub async fn get_table_data(
-        &self, 
-        connection_id: &str, 
-        table_name: &str,
-        limit: i32,
-        offset: i32
-    ) -> Result<TableData, VelocityError> {
+    pub async fn get_table_data(&self, connection_id: &str, table_name: &str, limit: i32, offset: i32) -> Result<TableData, VelocityError> {
         let pool = self.get_pool(connection_id).await
             .ok_or_else(|| VelocityError::Connection("Not connected".to_string()))?;
 
         let columns = self.get_table_schema(connection_id, table_name).await?;
         let column_names: Vec<String> = columns.iter().map(|c| c.name.clone()).collect();
-
-        let query = format!(
-            "SELECT * FROM {} LIMIT {} OFFSET {}",
-            table_name, limit, offset
-        );
+        let query = format!("SELECT * FROM {} LIMIT {} OFFSET {}", table_name, limit, offset);
 
         match pool.as_ref() {
             DatabasePool::Postgres(pool) => {
-                let rows = sqlx::query(&query)
-                    .fetch_all(pool)
-                    .await
-                    .map_err(|e| VelocityError::Query(e.to_string()))?;
-                
-                let data: Vec<Vec<serde_json::Value>> = rows.iter().map(|row| {
+                let rows = sqlx::query(&query).fetch_all(pool).await.map_err(|e| VelocityError::Query(e.to_string()))?;
+                let data = rows.iter().map(|row| {
                     use sqlx::Row;
                     column_names.iter().enumerate().map(|(i, _)| {
-                        if let Ok(v) = row.try_get::<String, _>(i) {
-                            serde_json::Value::String(v)
-                        } else if let Ok(v) = row.try_get::<i64, _>(i) {
-                            serde_json::Value::Number(v.into())
-                        } else if let Ok(v) = row.try_get::<i32, _>(i) {
-                            serde_json::Value::Number(v.into())
-                        } else if let Ok(v) = row.try_get::<f64, _>(i) {
-                            serde_json::Number::from_f64(v)
-                                .map(serde_json::Value::Number)
-                                .unwrap_or(serde_json::Value::Null)
-                        } else if let Ok(v) = row.try_get::<bool, _>(i) {
-                            serde_json::Value::Bool(v)
-                        } else {
-                            serde_json::Value::Null
-                        }
+                        row.try_get::<String, _>(i).map(serde_json::Value::String)
+                            .or_else(|_| row.try_get::<i64, _>(i).map(|v| serde_json::Value::Number(v.into())))
+                            .or_else(|_| row.try_get::<i32, _>(i).map(|v| serde_json::Value::Number(v.into())))
+                            .or_else(|_| row.try_get::<bool, _>(i).map(serde_json::Value::Bool))
+                            .unwrap_or(serde_json::Value::Null)
                     }).collect()
                 }).collect();
-
                 Ok(TableData { columns: column_names, rows: data })
             }
             DatabasePool::MySQL(pool) => {
-                let rows = sqlx::query(&query)
-                    .fetch_all(pool)
-                    .await
-                    .map_err(|e| VelocityError::Query(e.to_string()))?;
-                
-                let data: Vec<Vec<serde_json::Value>> = rows.iter().map(|row| {
+                let rows = sqlx::query(&query).fetch_all(pool).await.map_err(|e| VelocityError::Query(e.to_string()))?;
+                let data = rows.iter().map(|row| {
                     use sqlx::Row;
                     column_names.iter().enumerate().map(|(i, _)| {
-                        if let Ok(v) = row.try_get::<String, _>(i) {
-                            serde_json::Value::String(v)
-                        } else if let Ok(v) = row.try_get::<i64, _>(i) {
-                            serde_json::Value::Number(v.into())
-                        } else if let Ok(v) = row.try_get::<i32, _>(i) {
-                            serde_json::Value::Number(v.into())
-                        } else if let Ok(v) = row.try_get::<bool, _>(i) {
-                            serde_json::Value::Bool(v)
-                        } else {
-                            serde_json::Value::Null
-                        }
+                        row.try_get::<String, _>(i).map(serde_json::Value::String)
+                            .or_else(|_| row.try_get::<i64, _>(i).map(|v| serde_json::Value::Number(v.into())))
+                            .or_else(|_| row.try_get::<bool, _>(i).map(serde_json::Value::Bool))
+                            .unwrap_or(serde_json::Value::Null)
                     }).collect()
                 }).collect();
-
                 Ok(TableData { columns: column_names, rows: data })
             }
             DatabasePool::SQLite(pool) => {
-                let rows = sqlx::query(&query)
-                    .fetch_all(pool)
-                    .await
-                    .map_err(|e| VelocityError::Query(e.to_string()))?;
-                
-                let data: Vec<Vec<serde_json::Value>> = rows.iter().map(|row| {
+                let rows = sqlx::query(&query).fetch_all(pool).await.map_err(|e| VelocityError::Query(e.to_string()))?;
+                let data = rows.iter().map(|row| {
                     use sqlx::Row;
                     column_names.iter().enumerate().map(|(i, _)| {
-                        if let Ok(v) = row.try_get::<String, _>(i) {
-                            serde_json::Value::String(v)
-                        } else if let Ok(v) = row.try_get::<i64, _>(i) {
-                            serde_json::Value::Number(v.into())
-                        } else if let Ok(v) = row.try_get::<i32, _>(i) {
-                            serde_json::Value::Number(v.into())
-                        } else if let Ok(v) = row.try_get::<bool, _>(i) {
-                            serde_json::Value::Bool(v)
-                        } else {
-                            serde_json::Value::Null
-                        }
+                        row.try_get::<String, _>(i).map(serde_json::Value::String)
+                            .or_else(|_| row.try_get::<i64, _>(i).map(|v| serde_json::Value::Number(v.into())))
+                            .or_else(|_| row.try_get::<bool, _>(i).map(serde_json::Value::Bool))
+                            .unwrap_or(serde_json::Value::Null)
                     }).collect()
                 }).collect();
-
                 Ok(TableData { columns: column_names, rows: data })
             }
-            DatabasePool::SQLServer(_) => {
-                // Would need tiberius implementation
-                Ok(TableData { columns: vec![], rows: vec![] })
-            }
+            DatabasePool::SQLServer(_) => Ok(TableData { columns: vec![], rows: vec![] }),
             DatabasePool::Redis(redis_pool) => {
-                // For Redis, table_name is actually a key pattern or specific key
-                let mut conn = redis_pool.client.get_multiplexed_async_connection()
-                    .await
+                let mut conn = redis_pool.client.get_multiplexed_async_connection().await
                     .map_err(|e| VelocityError::Connection(e.to_string()))?;
-                
-                // Get the value of the key
-                let value: Option<String> = redis::cmd("GET")
-                    .arg(table_name)
-                    .query_async(&mut conn)
-                    .await
+                let value: Option<String> = redis::cmd("GET").arg(table_name).query_async(&mut conn).await
                     .map_err(|e| VelocityError::Query(e.to_string()))?;
-                
-                let rows = if let Some(v) = value {
-                    vec![vec![serde_json::Value::String(v)]]
-                } else {
-                    vec![]
-                };
-                
-                Ok(TableData { 
-                    columns: vec!["value".to_string()], 
-                    rows 
-                })
+                let rows = value.map(|v| vec![vec![serde_json::Value::String(v)]]).unwrap_or_default();
+                Ok(TableData { columns: vec!["value".into()], rows })
             }
         }
     }
 }
 
-/// Column information
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ColumnInfo {
@@ -647,7 +437,6 @@ pub struct ColumnInfo {
     pub is_primary_key: bool,
 }
 
-/// Table data result
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TableData {
     pub columns: Vec<String>,
@@ -655,7 +444,5 @@ pub struct TableData {
 }
 
 impl Default for ConnectionPoolManager {
-    fn default() -> Self {
-        Self::new()
-    }
+    fn default() -> Self { Self::new() }
 }

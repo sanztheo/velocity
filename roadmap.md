@@ -13,11 +13,11 @@
 | MySQL                         | ✅        | ✅     | Via sqlx              |
 | PostgreSQL                    | ✅        | ✅     | Via sqlx              |
 | SQLite                        | ✅        | ✅     | Via sqlx              |
-| MariaDB                       | ✅        | ❌     | Même driver MySQL     |
-| Microsoft SQL Server          | ✅        | ❌     | tiberius crate        |
-| Redis                         | ✅        | ❌     | redis-rs crate        |
-| CockroachDB                   | ✅        | ❌     | Compatible PostgreSQL |
-| Redshift                      | ✅        | ❌     | Compatible PostgreSQL |
+| MariaDB                       | ✅        | ✅     | Même driver MySQL     |
+| Microsoft SQL Server          | ✅        | ✅     | Via tiberius          |
+| Redis                         | ✅        | ✅     | Via redis-rs          |
+| CockroachDB                   | ✅        | ✅     | Compatible PostgreSQL |
+| Redshift                      | ✅        | ✅     | Compatible PostgreSQL |
 | Vertica                       | ✅        | ❌     | ODBC driver           |
 | Multi-connexions simultanées  | ✅        | ✅     | Pool manager          |
 | Multi-onglets/fenêtres        | ✅        | ✅     | Tab system            |
@@ -34,7 +34,7 @@
 | Liste tables                     | ✅        | ✅     |                 |
 | Liste vues                       | ✅        | ❌     |                 |
 | Liste fonctions                  | ✅        | ❌     |                 |
-| Liste colonnes/indexes           | ✅        | ❌     | Schema explorer |
+| Liste colonnes/indexes           | ✅        | ✅     | Schema explorer |
 | Sidebar avec tree view           | ✅        | ✅     |                 |
 | Recherche rapide "Open Anything" | ✅        | ❌     | Cmd+K           |
 | Preview relations/FK             | ✅        | ❌     |                 |
@@ -43,7 +43,7 @@
 
 | Fonctionnalité                 | TablePlus | Status | Notes          |
 | ------------------------------ | --------- | ------ | -------------- |
-| Vue grille (spreadsheet)       | ✅        | ❌     | TanStack Table |
+| Vue grille (spreadsheet)       | ✅        | ✅     | TanStack Table |
 | Édition inline cellules        | ✅        | ❌     |                |
 | Ajout de lignes                | ✅        | ❌     |                |
 | Suppression de lignes          | ✅        | ❌     |                |
@@ -51,7 +51,7 @@
 | Rollback/Annuler changements   | ✅        | ❌     |                |
 | Aperçu SQL généré              | ✅        | ❌     | Modal preview  |
 | Couleurs pour types de données | ✅        | ❌     |                |
-| NULL handling visuel           | ✅        | ❌     | Badge spécial  |
+| NULL handling visuel           | ✅        | ✅     | Badge spécial  |
 
 #### 🖥️ Éditeur SQL
 
@@ -80,7 +80,7 @@
 | Filtre IS NULL             | ✅        | ❌     |             |
 | Filtre IN (...)            | ✅        | ❌     |             |
 | Filtres combinés (AND/OR)  | ✅        | ❌     |             |
-| Pagination                 | ✅        | ❌     | Server-side |
+| Pagination                 | ✅        | ✅     | Server-side |
 | Jump to page               | ✅        | ❌     |             |
 | Rows per page config       | ✅        | ❌     |             |
 
@@ -88,7 +88,7 @@
 
 | Fonctionnalité                | TablePlus | Status | Notes          |
 | ----------------------------- | --------- | ------ | -------------- |
-| Voir schema table             | ✅        | ❌     |                |
+| Voir schema table             | ✅        | ✅     |                |
 | Créer table (UI)              | ✅        | ❌     |                |
 | Modifier colonnes (UI)        | ✅        | ❌     |                |
 | Ajouter/supprimer colonnes    | ✅        | ❌     |                |
@@ -140,16 +140,16 @@
 
 | Catégorie       | ✅ Fait | 🔄 En cours | ❌ À faire |
 | --------------- | ------- | ----------- | ---------- |
-| Connexions      | 3       | 1           | 11         |
-| Navigation      | 1       | 0           | 7          |
-| Édition Données | 0       | 0           | 9          |
+| Connexions      | 12      | 0           | 3          |
+| Navigation      | 4       | 0           | 4          |
+| Édition Données | 2       | 0           | 7          |
 | Éditeur SQL     | 0       | 1           | 11         |
-| Filtrage        | 0       | 0           | 9          |
-| Structure       | 0       | 0           | 7          |
+| Filtrage        | 1       | 0           | 8          |
+| Structure       | 1       | 0           | 6          |
 | Import/Export   | 0       | 0           | 7          |
 | Sécurité        | 1       | 0           | 5          |
-| UX              | 7       | 1           | 4          |
-| **TOTAL**       | **12**  | **3**       | **70**     |
+| UX              | 8       | 1           | 3          |
+| **TOTAL**       | **29**  | **2**       | **54**     |
 
 ### 6.3 Fonctionnalités Velocity Uniques (différenciation)
 
