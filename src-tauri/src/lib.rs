@@ -3,21 +3,28 @@ pub mod store;
 pub mod error;
 pub mod commands;
 pub mod db;
+pub mod ssh;
 
 use std::sync::Arc;
 use tauri::Manager;
 use commands::connections::*;
 use commands::database::*;
+use commands::keychain::*;
+use commands::ssh::*;
 use db::ConnectionPoolManager;
+use ssh::tunnel::SshTunnelManager;
 use store::connections::ConnectionsStore;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let pool_manager = Arc::new(ConnectionPoolManager::new());
+    let ssh_manager = Arc::new(SshTunnelManager::new());
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_keyring::init())
         .manage(pool_manager)
+        .manage(ssh_manager)
         .setup(|app| {
             let store = ConnectionsStore::new(&app.handle())
                 .expect("Failed to initialize connections store");
@@ -37,7 +44,15 @@ pub fn run() {
             list_databases,
             list_tables,
             get_table_schema,
-            get_table_data
+            get_table_data,
+            // Keychain operations
+            save_password,
+            get_password,
+            delete_password,
+            // SSH Tunnel operations
+            create_ssh_tunnel,
+            close_ssh_tunnel,
+            get_tunnel_port
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

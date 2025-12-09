@@ -22,9 +22,9 @@
 | Multi-connexions simultanées  | ✅        | ✅     | Pool manager          |
 | Multi-onglets/fenêtres        | ✅        | ✅     | Tab system            |
 | SSL/TLS                       | ✅        | ✅     | Config par connexion  |
-| SSH Tunnel                    | ✅        | ❌     | russh crate           |
+| SSH Tunnel                    | ✅        | 🔄     | Placeholder impl      |
 | Persistence connexions (JSON) | ✅        | ✅     | AppData config        |
-| Keychain/Credential Manager   | ✅        | ❌     | tauri-plugin-keyring  |
+| Keychain/Credential Manager   | ✅        | ✅     | tauri-plugin-keyring  |
 
 #### 🗂️ Navigation et Exploration
 
@@ -140,7 +140,7 @@
 
 | Catégorie       | ✅ Fait | 🔄 En cours | ❌ À faire |
 | --------------- | ------- | ----------- | ---------- |
-| Connexions      | 12      | 0           | 3          |
+| Connexions      | 13      | 1           | 1          |
 | Navigation      | 4       | 0           | 4          |
 | Édition Données | 2       | 0           | 7          |
 | Éditeur SQL     | 0       | 1           | 11         |
@@ -149,7 +149,7 @@
 | Import/Export   | 0       | 0           | 7          |
 | Sécurité        | 1       | 0           | 5          |
 | UX              | 8       | 1           | 3          |
-| **TOTAL**       | **29**  | **2**       | **54**     |
+| **TOTAL**       | **30**  | **3**       | **52**     |
 
 ### 6.3 Fonctionnalités Velocity Uniques (différenciation)
 
