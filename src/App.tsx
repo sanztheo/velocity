@@ -4,12 +4,20 @@ import { useAppStore } from "@/stores/app.store";
 import { Toaster } from "@/components/ui/sonner";
 
 function App() {
-  const { setTheme, theme, activeTabId, tabs } = useAppStore();
+  const { theme, activeTabId, tabs } = useAppStore();
 
   useEffect(() => {
-    // Initialize theme
-    setTheme(theme);
-  }, [setTheme, theme]);
+    // Apply theme to document
+    const root = document.documentElement;
+    root.classList.remove("light", "dark");
+    
+    if (theme === "system") {
+      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      root.classList.add(systemTheme);
+    } else {
+      root.classList.add(theme);
+    }
+  }, [theme]);
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
 
@@ -17,8 +25,8 @@ function App() {
     <>
       <AppLayout>
         {activeTab ? (
-          <div className="p-4">
-            <h1 className="text-2xl font-bold mb-2">{activeTab.title}</h1>
+          <div className="p-6">
+            <h1 className="text-2xl font-bold mb-2 text-foreground">{activeTab.title}</h1>
             <div className="text-muted-foreground">
               {activeTab.type === 'query' && "Query Editor Placeholder"}
               {activeTab.type === 'table' && "Table Viewer Placeholder"}
@@ -26,17 +34,18 @@ function App() {
             </div>
           </div>
         ) : (
-          <div className="flex h-full items-center justify-center text-muted-foreground">
+          <div className="flex h-full items-center justify-center">
             <div className="text-center">
-              <h2 className="text-lg font-semibold mb-1">Welcome to Velocity</h2>
-              <p className="text-sm">Select a connection to start</p>
+              <h2 className="text-xl font-semibold mb-2 text-foreground">Welcome to Velocity</h2>
+              <p className="text-muted-foreground">Select a connection to start</p>
             </div>
           </div>
         )}
       </AppLayout>
-      <Toaster />
+      <Toaster position="top-right" />
     </>
   );
 }
 
 export default App;
+

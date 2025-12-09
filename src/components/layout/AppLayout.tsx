@@ -11,7 +11,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const { sidebarCollapsed } = useAppStore();
 
   return (
-    <div className="h-screen w-screen bg-background overflow-hidden flex flex-col">
+    <div className="h-screen w-screen overflow-hidden flex flex-col bg-background text-foreground">
       <div className="flex-1 flex overflow-hidden">
         <ResizablePanelGroup direction="horizontal">
           <ResizablePanel 
@@ -25,20 +25,19 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             <Sidebar />
           </ResizablePanel>
           
-          <ResizableHandle />
+          <ResizableHandle className="w-px bg-border hover:bg-primary/50 transition-colors" />
           
           <ResizablePanel defaultSize={80}>
-            <div className="flex flex-col h-full w-full">
+            <div className="flex flex-col h-full w-full bg-background">
               <TabBar />
-              <main className="flex-1 overflow-auto bg-background/50">
+              <main className="flex-1 overflow-auto">
                 {children}
               </main>
             </div>
           </ResizablePanel>
         </ResizablePanelGroup>
       </div>
-      
-      {/* Optional Status Bar could go here */}
     </div>
   );
 }
+
