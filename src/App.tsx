@@ -1,50 +1,41 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
-import "./App.css";
+import { useEffect } from "react";
+import { AppLayout } from "@/components/layout/AppLayout";
+import { useAppStore } from "@/stores/app.store";
+import { Toaster } from "@/components/ui/sonner";
 
 function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+  const { setTheme, theme, activeTabId, tabs } = useAppStore();
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
-  }
+  useEffect(() => {
+    // Initialize theme
+    setTheme(theme);
+  }, [setTheme, theme]);
+
+  const activeTab = tabs.find((t) => t.id === activeTabId);
 
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
-
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
-    </main>
+    <>
+      <AppLayout>
+        {activeTab ? (
+          <div className="p-4">
+            <h1 className="text-2xl font-bold mb-2">{activeTab.title}</h1>
+            <div className="text-muted-foreground">
+              {activeTab.type === 'query' && "Query Editor Placeholder"}
+              {activeTab.type === 'table' && "Table Viewer Placeholder"}
+              {activeTab.type === 'structure' && "Schema Viewer Placeholder"}
+            </div>
+          </div>
+        ) : (
+          <div className="flex h-full items-center justify-center text-muted-foreground">
+            <div className="text-center">
+              <h2 className="text-lg font-semibold mb-1">Welcome to Velocity</h2>
+              <p className="text-sm">Select a connection to start</p>
+            </div>
+          </div>
+        )}
+      </AppLayout>
+      <Toaster />
+    </>
   );
 }
 
