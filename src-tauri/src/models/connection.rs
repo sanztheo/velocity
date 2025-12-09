@@ -5,12 +5,12 @@ use chrono::{DateTime, Utc};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Connection {
-    pub id: String,                    // UUID v4
-    pub name: String,                  // Nom affiché
-    pub db_type: DatabaseType,         // SQLite | PostgreSQL | MySQL
-    pub config: ConnectionConfig,      // Config spécifique
-    pub favorite: bool,                // Marqué favori
-    pub color: Option<String>,         // Couleur badge (#hex)
+    pub id: String,
+    pub name: String,
+    pub db_type: DatabaseType,
+    pub config: ConnectionConfig,
+    pub favorite: bool,
+    pub color: Option<String>,
     pub last_used_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
 }
@@ -26,7 +26,7 @@ pub enum ConnectionConfig {
         port: u16,
         database: String,
         username: String,
-        password: Option<String>,      // Chiffré ou non stocké
+        password: Option<String>,
         ssl: SslConfig,
     },
     MySQL {
@@ -37,13 +37,53 @@ pub enum ConnectionConfig {
         password: Option<String>,
         ssl: SslConfig,
     },
+    MariaDB {
+        host: String,
+        port: u16,
+        database: String,
+        username: String,
+        password: Option<String>,
+        ssl: SslConfig,
+    },
+    CockroachDB {
+        host: String,
+        port: u16,
+        database: String,
+        username: String,
+        password: Option<String>,
+        ssl: SslConfig,
+    },
+    Redshift {
+        host: String,
+        port: u16,
+        database: String,
+        username: String,
+        password: Option<String>,
+        ssl: SslConfig,
+    },
+    SQLServer {
+        host: String,
+        port: u16,
+        database: String,
+        username: String,
+        password: Option<String>,
+        encrypt: bool,
+        trust_server_certificate: bool,
+    },
+    Redis {
+        host: String,
+        port: u16,
+        password: Option<String>,
+        database: u8, // Redis DB index (0-15)
+        use_tls: bool,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SslConfig {
     pub enabled: bool,
-    pub mode: SslMode,                 // Disable | Prefer | Require | VerifyCA | VerifyFull
+    pub mode: SslMode,
     pub ca_cert_path: Option<PathBuf>,
     pub client_cert_path: Option<PathBuf>,
     pub client_key_path: Option<PathBuf>,
@@ -63,4 +103,9 @@ pub enum DatabaseType {
     SQLite,
     PostgreSQL,
     MySQL,
+    MariaDB,
+    CockroachDB,
+    Redshift,
+    SQLServer,
+    Redis,
 }

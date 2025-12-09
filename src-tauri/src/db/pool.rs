@@ -3,13 +3,27 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use sqlx::{Pool, Postgres, MySql, Sqlite};
 use crate::error::VelocityError;
-use crate::models::connection::{Connection, ConnectionConfig, DatabaseType};
+use crate::models::connection::{Connection, ConnectionConfig};
 
 /// Enum to hold different database pool types
 pub enum DatabasePool {
     Postgres(Pool<Postgres>),
     MySQL(Pool<MySql>),
     SQLite(Pool<Sqlite>),
+    // SQL Server uses a different connection type
+    SQLServer(SqlServerPool),
+    // Redis uses its own client
+    Redis(RedisPool),
+}
+
+/// SQL Server connection wrapper
+pub struct SqlServerPool {
+    config: tiberius::Config,
+}
+
+/// Redis connection wrapper  
+pub struct RedisPool {
+    client: redis::Client,
 }
 
 /// Global connection pool manager
@@ -27,7 +41,9 @@ impl ConnectionPoolManager {
     /// Test a connection without storing it
     pub async fn test_connection(connection: &Connection) -> Result<(), VelocityError> {
         match &connection.config {
-            ConnectionConfig::PostgreSQL { host, port, database, username, password, .. } => {
+            ConnectionConfig::PostgreSQL { host, port, database, username, password, .. } |
+            ConnectionConfig::CockroachDB { host, port, database, username, password, .. } |
+            ConnectionConfig::Redshift { host, port, database, username, password, .. } => {
                 let url = format!(
                     "postgres://{}:{}@{}:{}/{}",
                     username,
@@ -44,7 +60,6 @@ impl ConnectionPoolManager {
                     .await
                     .map_err(|e| VelocityError::Connection(e.to_string()))?;
                 
-                // Test with a simple query
                 sqlx::query("SELECT 1")
                     .execute(&pool)
                     .await
@@ -53,7 +68,8 @@ impl ConnectionPoolManager {
                 pool.close().await;
                 Ok(())
             }
-            ConnectionConfig::MySQL { host, port, database, username, password, .. } => {
+            ConnectionConfig::MySQL { host, port, database, username, password, .. } |
+            ConnectionConfig::MariaDB { host, port, database, username, password, .. } => {
                 let url = format!(
                     "mysql://{}:{}@{}:{}/{}",
                     username,
@@ -96,13 +112,81 @@ impl ConnectionPoolManager {
                 pool.close().await;
                 Ok(())
             }
+            ConnectionConfig::SQLServer { host, port, database, username, password, encrypt, trust_server_certificate } => {
+                use tokio::net::TcpStream;
+                use tokio_util::compat::TokioAsyncWriteCompatExt;
+                
+                let mut config = tiberius::Config::new();
+                config.host(host);
+                config.port(*port);
+                config.database(database);
+                config.authentication(tiberius::AuthMethod::sql_server(username, password.as_deref().unwrap_or("")));
+                
+                if *encrypt {
+                    config.encryption(tiberius::EncryptionLevel::Required);
+                } else {
+                    config.encryption(tiberius::EncryptionLevel::NotSupported);
+                }
+                
+                if *trust_server_certificate {
+                    config.trust_cert();
+                }
+                
+                let tcp = TcpStream::connect(format!("{}:{}", host, port))
+                    .await
+                    .map_err(|e| VelocityError::Connection(e.to_string()))?;
+                tcp.set_nodelay(true).map_err(|e| VelocityError::Connection(e.to_string()))?;
+                
+                let mut client = tiberius::Client::connect(config, tcp.compat_write())
+                    .await
+                    .map_err(|e| VelocityError::Connection(e.to_string()))?;
+                
+                // Test query
+                client.simple_query("SELECT 1")
+                    .await
+                    .map_err(|e| VelocityError::Query(e.to_string()))?;
+                
+                Ok(())
+            }
+            ConnectionConfig::Redis { host, port, password, database, use_tls } => {
+                let url = if let Some(pwd) = password {
+                    if *use_tls {
+                        format!("rediss://:{}@{}:{}/{}", pwd, host, port, database)
+                    } else {
+                        format!("redis://:{}@{}:{}/{}", pwd, host, port, database)
+                    }
+                } else {
+                    if *use_tls {
+                        format!("rediss://{}:{}/{}", host, port, database)
+                    } else {
+                        format!("redis://{}:{}/{}", host, port, database)
+                    }
+                };
+                
+                let client = redis::Client::open(url)
+                    .map_err(|e| VelocityError::Connection(e.to_string()))?;
+                
+                let mut conn = client.get_multiplexed_async_connection()
+                    .await
+                    .map_err(|e| VelocityError::Connection(e.to_string()))?;
+                
+                // Test with PING
+                redis::cmd("PING")
+                    .query_async::<String>(&mut conn)
+                    .await
+                    .map_err(|e| VelocityError::Connection(e.to_string()))?;
+                
+                Ok(())
+            }
         }
     }
 
     /// Connect and store the pool
     pub async fn connect(&self, connection: &Connection) -> Result<(), VelocityError> {
         let pool = match &connection.config {
-            ConnectionConfig::PostgreSQL { host, port, database, username, password, .. } => {
+            ConnectionConfig::PostgreSQL { host, port, database, username, password, .. } |
+            ConnectionConfig::CockroachDB { host, port, database, username, password, .. } |
+            ConnectionConfig::Redshift { host, port, database, username, password, .. } => {
                 let url = format!(
                     "postgres://{}:{}@{}:{}/{}",
                     username,
@@ -121,7 +205,8 @@ impl ConnectionPoolManager {
                 
                 DatabasePool::Postgres(pool)
             }
-            ConnectionConfig::MySQL { host, port, database, username, password, .. } => {
+            ConnectionConfig::MySQL { host, port, database, username, password, .. } |
+            ConnectionConfig::MariaDB { host, port, database, username, password, .. } => {
                 let url = format!(
                     "mysql://{}:{}@{}:{}/{}",
                     username,
@@ -152,6 +237,45 @@ impl ConnectionPoolManager {
                 
                 DatabasePool::SQLite(pool)
             }
+            ConnectionConfig::SQLServer { host, port, database, username, password, encrypt, trust_server_certificate } => {
+                let mut config = tiberius::Config::new();
+                config.host(host);
+                config.port(*port);
+                config.database(database);
+                config.authentication(tiberius::AuthMethod::sql_server(username, password.as_deref().unwrap_or("")));
+                
+                if *encrypt {
+                    config.encryption(tiberius::EncryptionLevel::Required);
+                } else {
+                    config.encryption(tiberius::EncryptionLevel::NotSupported);
+                }
+                
+                if *trust_server_certificate {
+                    config.trust_cert();
+                }
+                
+                DatabasePool::SQLServer(SqlServerPool { config })
+            }
+            ConnectionConfig::Redis { host, port, password, database, use_tls } => {
+                let url = if let Some(pwd) = password {
+                    if *use_tls {
+                        format!("rediss://:{}@{}:{}/{}", pwd, host, port, database)
+                    } else {
+                        format!("redis://:{}@{}:{}/{}", pwd, host, port, database)
+                    }
+                } else {
+                    if *use_tls {
+                        format!("rediss://{}:{}/{}", host, port, database)
+                    } else {
+                        format!("redis://{}:{}/{}", host, port, database)
+                    }
+                };
+                
+                let client = redis::Client::open(url)
+                    .map_err(|e| VelocityError::Connection(e.to_string()))?;
+                
+                DatabasePool::Redis(RedisPool { client })
+            }
         };
 
         let mut pools = self.pools.write().await;
@@ -169,11 +293,11 @@ impl ConnectionPoolManager {
                         DatabasePool::Postgres(pool) => pool.close().await,
                         DatabasePool::MySQL(pool) => pool.close().await,
                         DatabasePool::SQLite(pool) => pool.close().await,
+                        DatabasePool::SQLServer(_) => {}, // No explicit close needed
+                        DatabasePool::Redis(_) => {}, // No explicit close needed
                     }
                 }
-                Err(_) => {
-                    // Pool is still in use somewhere
-                }
+                Err(_) => {}
             }
         }
         Ok(())
@@ -216,8 +340,15 @@ impl ConnectionPoolManager {
                 Ok(rows.into_iter().map(|r| r.0).collect())
             }
             DatabasePool::SQLite(_) => {
-                // SQLite doesn't have multiple databases
                 Ok(vec!["main".to_string()])
+            }
+            DatabasePool::SQLServer(_) => {
+                // Would need to execute query via tiberius
+                Ok(vec!["master".to_string()])
+            }
+            DatabasePool::Redis(_) => {
+                // Redis has 16 databases (0-15)
+                Ok((0..16).map(|i| format!("db{}", i)).collect())
             }
         }
     }
@@ -256,6 +387,24 @@ impl ConnectionPoolManager {
                 
                 Ok(rows.into_iter().map(|r| r.0).collect())
             }
+            DatabasePool::SQLServer(_) => {
+                // Would need tiberius query
+                Ok(vec![])
+            }
+            DatabasePool::Redis(redis_pool) => {
+                // Redis uses KEYS command instead of tables
+                let mut conn = redis_pool.client.get_multiplexed_async_connection()
+                    .await
+                    .map_err(|e| VelocityError::Connection(e.to_string()))?;
+                
+                let keys: Vec<String> = redis::cmd("KEYS")
+                    .arg("*")
+                    .query_async(&mut conn)
+                    .await
+                    .map_err(|e| VelocityError::Query(e.to_string()))?;
+                
+                Ok(keys)
+            }
         }
     }
 
@@ -289,7 +438,7 @@ impl ConnectionPoolManager {
                         data_type,
                         nullable: nullable == "YES",
                         max_length,
-                        is_primary_key: false, // Would need additional query
+                        is_primary_key: false,
                     }
                 }).collect())
             }
@@ -339,6 +488,20 @@ impl ConnectionPoolManager {
                     }
                 }).collect())
             }
+            DatabasePool::SQLServer(_) => {
+                // Would need tiberius implementation
+                Ok(vec![])
+            }
+            DatabasePool::Redis(_) => {
+                // Redis doesn't have schemas - return key type
+                Ok(vec![ColumnInfo {
+                    name: "value".to_string(),
+                    data_type: "string".to_string(),
+                    nullable: true,
+                    max_length: None,
+                    is_primary_key: false,
+                }])
+            }
         }
     }
 
@@ -353,11 +516,9 @@ impl ConnectionPoolManager {
         let pool = self.get_pool(connection_id).await
             .ok_or_else(|| VelocityError::Connection("Not connected".to_string()))?;
 
-        // First get columns
         let columns = self.get_table_schema(connection_id, table_name).await?;
         let column_names: Vec<String> = columns.iter().map(|c| c.name.clone()).collect();
 
-        // Build query - use raw query to get dynamic columns
         let query = format!(
             "SELECT * FROM {} LIMIT {} OFFSET {}",
             table_name, limit, offset
@@ -373,7 +534,6 @@ impl ConnectionPoolManager {
                 let data: Vec<Vec<serde_json::Value>> = rows.iter().map(|row| {
                     use sqlx::Row;
                     column_names.iter().enumerate().map(|(i, _)| {
-                        // Try to get as different types
                         if let Ok(v) = row.try_get::<String, _>(i) {
                             serde_json::Value::String(v)
                         } else if let Ok(v) = row.try_get::<i64, _>(i) {
@@ -444,6 +604,34 @@ impl ConnectionPoolManager {
 
                 Ok(TableData { columns: column_names, rows: data })
             }
+            DatabasePool::SQLServer(_) => {
+                // Would need tiberius implementation
+                Ok(TableData { columns: vec![], rows: vec![] })
+            }
+            DatabasePool::Redis(redis_pool) => {
+                // For Redis, table_name is actually a key pattern or specific key
+                let mut conn = redis_pool.client.get_multiplexed_async_connection()
+                    .await
+                    .map_err(|e| VelocityError::Connection(e.to_string()))?;
+                
+                // Get the value of the key
+                let value: Option<String> = redis::cmd("GET")
+                    .arg(table_name)
+                    .query_async(&mut conn)
+                    .await
+                    .map_err(|e| VelocityError::Query(e.to_string()))?;
+                
+                let rows = if let Some(v) = value {
+                    vec![vec![serde_json::Value::String(v)]]
+                } else {
+                    vec![]
+                };
+                
+                Ok(TableData { 
+                    columns: vec!["value".to_string()], 
+                    rows 
+                })
+            }
         }
     }
 }
@@ -471,4 +659,3 @@ impl Default for ConnectionPoolManager {
         Self::new()
     }
 }
-
