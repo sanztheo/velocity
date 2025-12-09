@@ -1,6 +1,6 @@
 use tauri::State;
 use std::sync::Arc;
-use crate::db::ConnectionPoolManager;
+use crate::db::{ConnectionPoolManager, ColumnInfo, TableData};
 use crate::error::VelocityError;
 use crate::models::connection::Connection;
 use crate::store::connections::ConnectionsStore;
@@ -65,3 +65,26 @@ pub async fn list_tables(
 ) -> Result<Vec<String>, VelocityError> {
     pool_manager.list_tables(&id).await
 }
+
+/// Get table schema (columns)
+#[tauri::command]
+pub async fn get_table_schema(
+    connection_id: String,
+    table_name: String,
+    pool_manager: State<'_, Arc<ConnectionPoolManager>>,
+) -> Result<Vec<ColumnInfo>, VelocityError> {
+    pool_manager.get_table_schema(&connection_id, &table_name).await
+}
+
+/// Get table data with pagination
+#[tauri::command]
+pub async fn get_table_data(
+    connection_id: String,
+    table_name: String,
+    limit: i32,
+    offset: i32,
+    pool_manager: State<'_, Arc<ConnectionPoolManager>>,
+) -> Result<TableData, VelocityError> {
+    pool_manager.get_table_data(&connection_id, &table_name, limit, offset).await
+}
+

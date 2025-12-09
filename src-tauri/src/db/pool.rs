@@ -258,6 +258,212 @@ impl ConnectionPoolManager {
             }
         }
     }
+
+    /// Get table schema (columns info)
+    pub async fn get_table_schema(&self, connection_id: &str, table_name: &str) -> Result<Vec<ColumnInfo>, VelocityError> {
+        let pool = self.get_pool(connection_id).await
+            .ok_or_else(|| VelocityError::Connection("Not connected".to_string()))?;
+
+        match pool.as_ref() {
+            DatabasePool::Postgres(pool) => {
+                let rows: Vec<(String, String, String, Option<i32>)> = sqlx::query_as(
+                    r#"
+                    SELECT 
+                        column_name,
+                        data_type,
+                        CASE WHEN is_nullable = 'YES' THEN 'YES' ELSE 'NO' END,
+                        character_maximum_length
+                    FROM information_schema.columns 
+                    WHERE table_name = $1 AND table_schema = 'public'
+                    ORDER BY ordinal_position
+                    "#
+                )
+                .bind(table_name)
+                .fetch_all(pool)
+                .await
+                .map_err(|e| VelocityError::Query(e.to_string()))?;
+                
+                Ok(rows.into_iter().map(|(name, data_type, nullable, max_length)| {
+                    ColumnInfo {
+                        name,
+                        data_type,
+                        nullable: nullable == "YES",
+                        max_length,
+                        is_primary_key: false, // Would need additional query
+                    }
+                }).collect())
+            }
+            DatabasePool::MySQL(pool) => {
+                let rows: Vec<(String, String, String, Option<i64>)> = sqlx::query_as(
+                    r#"
+                    SELECT 
+                        COLUMN_NAME,
+                        DATA_TYPE,
+                        IS_NULLABLE,
+                        CHARACTER_MAXIMUM_LENGTH
+                    FROM INFORMATION_SCHEMA.COLUMNS 
+                    WHERE TABLE_NAME = ?
+                    ORDER BY ORDINAL_POSITION
+                    "#
+                )
+                .bind(table_name)
+                .fetch_all(pool)
+                .await
+                .map_err(|e| VelocityError::Query(e.to_string()))?;
+                
+                Ok(rows.into_iter().map(|(name, data_type, nullable, max_length)| {
+                    ColumnInfo {
+                        name,
+                        data_type,
+                        nullable: nullable == "YES",
+                        max_length: max_length.map(|l| l as i32),
+                        is_primary_key: false,
+                    }
+                }).collect())
+            }
+            DatabasePool::SQLite(pool) => {
+                let rows: Vec<(String, String, i32)> = sqlx::query_as(
+                    &format!("PRAGMA table_info({})", table_name)
+                )
+                .fetch_all(pool)
+                .await
+                .map_err(|e| VelocityError::Query(e.to_string()))?;
+                
+                Ok(rows.into_iter().map(|(name, data_type, notnull)| {
+                    ColumnInfo {
+                        name,
+                        data_type,
+                        nullable: notnull == 0,
+                        max_length: None,
+                        is_primary_key: false,
+                    }
+                }).collect())
+            }
+        }
+    }
+
+    /// Get table data with pagination
+    pub async fn get_table_data(
+        &self, 
+        connection_id: &str, 
+        table_name: &str,
+        limit: i32,
+        offset: i32
+    ) -> Result<TableData, VelocityError> {
+        let pool = self.get_pool(connection_id).await
+            .ok_or_else(|| VelocityError::Connection("Not connected".to_string()))?;
+
+        // First get columns
+        let columns = self.get_table_schema(connection_id, table_name).await?;
+        let column_names: Vec<String> = columns.iter().map(|c| c.name.clone()).collect();
+
+        // Build query - use raw query to get dynamic columns
+        let query = format!(
+            "SELECT * FROM {} LIMIT {} OFFSET {}",
+            table_name, limit, offset
+        );
+
+        match pool.as_ref() {
+            DatabasePool::Postgres(pool) => {
+                let rows = sqlx::query(&query)
+                    .fetch_all(pool)
+                    .await
+                    .map_err(|e| VelocityError::Query(e.to_string()))?;
+                
+                let data: Vec<Vec<serde_json::Value>> = rows.iter().map(|row| {
+                    use sqlx::Row;
+                    column_names.iter().enumerate().map(|(i, _)| {
+                        // Try to get as different types
+                        if let Ok(v) = row.try_get::<String, _>(i) {
+                            serde_json::Value::String(v)
+                        } else if let Ok(v) = row.try_get::<i64, _>(i) {
+                            serde_json::Value::Number(v.into())
+                        } else if let Ok(v) = row.try_get::<i32, _>(i) {
+                            serde_json::Value::Number(v.into())
+                        } else if let Ok(v) = row.try_get::<f64, _>(i) {
+                            serde_json::Number::from_f64(v)
+                                .map(serde_json::Value::Number)
+                                .unwrap_or(serde_json::Value::Null)
+                        } else if let Ok(v) = row.try_get::<bool, _>(i) {
+                            serde_json::Value::Bool(v)
+                        } else {
+                            serde_json::Value::Null
+                        }
+                    }).collect()
+                }).collect();
+
+                Ok(TableData { columns: column_names, rows: data })
+            }
+            DatabasePool::MySQL(pool) => {
+                let rows = sqlx::query(&query)
+                    .fetch_all(pool)
+                    .await
+                    .map_err(|e| VelocityError::Query(e.to_string()))?;
+                
+                let data: Vec<Vec<serde_json::Value>> = rows.iter().map(|row| {
+                    use sqlx::Row;
+                    column_names.iter().enumerate().map(|(i, _)| {
+                        if let Ok(v) = row.try_get::<String, _>(i) {
+                            serde_json::Value::String(v)
+                        } else if let Ok(v) = row.try_get::<i64, _>(i) {
+                            serde_json::Value::Number(v.into())
+                        } else if let Ok(v) = row.try_get::<i32, _>(i) {
+                            serde_json::Value::Number(v.into())
+                        } else if let Ok(v) = row.try_get::<bool, _>(i) {
+                            serde_json::Value::Bool(v)
+                        } else {
+                            serde_json::Value::Null
+                        }
+                    }).collect()
+                }).collect();
+
+                Ok(TableData { columns: column_names, rows: data })
+            }
+            DatabasePool::SQLite(pool) => {
+                let rows = sqlx::query(&query)
+                    .fetch_all(pool)
+                    .await
+                    .map_err(|e| VelocityError::Query(e.to_string()))?;
+                
+                let data: Vec<Vec<serde_json::Value>> = rows.iter().map(|row| {
+                    use sqlx::Row;
+                    column_names.iter().enumerate().map(|(i, _)| {
+                        if let Ok(v) = row.try_get::<String, _>(i) {
+                            serde_json::Value::String(v)
+                        } else if let Ok(v) = row.try_get::<i64, _>(i) {
+                            serde_json::Value::Number(v.into())
+                        } else if let Ok(v) = row.try_get::<i32, _>(i) {
+                            serde_json::Value::Number(v.into())
+                        } else if let Ok(v) = row.try_get::<bool, _>(i) {
+                            serde_json::Value::Bool(v)
+                        } else {
+                            serde_json::Value::Null
+                        }
+                    }).collect()
+                }).collect();
+
+                Ok(TableData { columns: column_names, rows: data })
+            }
+        }
+    }
+}
+
+/// Column information
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ColumnInfo {
+    pub name: String,
+    pub data_type: String,
+    pub nullable: bool,
+    pub max_length: Option<i32>,
+    pub is_primary_key: bool,
+}
+
+/// Table data result
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct TableData {
+    pub columns: Vec<String>,
+    pub rows: Vec<Vec<serde_json::Value>>,
 }
 
 impl Default for ConnectionPoolManager {
@@ -265,3 +471,4 @@ impl Default for ConnectionPoolManager {
         Self::new()
     }
 }
+

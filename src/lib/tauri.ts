@@ -39,3 +39,31 @@ export async function listTables(id: string): Promise<string[]> {
   return await invoke("list_tables", { id });
 }
 
+// Table operations
+export interface ColumnInfo {
+  name: string;
+  dataType: string;
+  nullable: boolean;
+  maxLength: number | null;
+  isPrimaryKey: boolean;
+}
+
+export interface TableData {
+  columns: string[];
+  rows: unknown[][];
+}
+
+export async function getTableSchema(connectionId: string, tableName: string): Promise<ColumnInfo[]> {
+  return await invoke("get_table_schema", { connectionId, tableName });
+}
+
+export async function getTableData(
+  connectionId: string, 
+  tableName: string, 
+  limit: number = 100, 
+  offset: number = 0
+): Promise<TableData> {
+  return await invoke("get_table_data", { connectionId, tableName, limit, offset });
+}
+
+

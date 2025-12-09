@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useAppStore } from "@/stores/app.store";
 import { Toaster } from "@/components/ui/sonner";
+import { TableViewer } from "@/components/tables/TableViewer";
 
 function App() {
   const { theme, activeTabId, tabs } = useAppStore();
@@ -25,19 +26,31 @@ function App() {
     <>
       <AppLayout>
         {activeTab ? (
-          <div className="p-6">
-            <h1 className="text-2xl font-bold mb-2 text-foreground">{activeTab.title}</h1>
-            <div className="text-muted-foreground">
-              {activeTab.type === 'query' && "Query Editor Placeholder"}
-              {activeTab.type === 'table' && "Table Viewer Placeholder"}
-              {activeTab.type === 'structure' && "Schema Viewer Placeholder"}
-            </div>
+          <div className="h-full flex flex-col">
+            {activeTab.type === 'table' && activeTab.connectionId && (
+              <TableViewer 
+                connectionId={activeTab.connectionId} 
+                tableName={activeTab.title}
+              />
+            )}
+            {activeTab.type === 'query' && (
+              <div className="p-6">
+                <h1 className="text-2xl font-bold mb-2 text-foreground">{activeTab.title}</h1>
+                <div className="text-muted-foreground">Query Editor - Coming soon</div>
+              </div>
+            )}
+            {activeTab.type === 'structure' && (
+              <div className="p-6">
+                <h1 className="text-2xl font-bold mb-2 text-foreground">{activeTab.title}</h1>
+                <div className="text-muted-foreground">Schema Viewer - Coming soon</div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="flex h-full items-center justify-center">
             <div className="text-center">
               <h2 className="text-xl font-semibold mb-2 text-foreground">Welcome to Velocity</h2>
-              <p className="text-muted-foreground">Select a connection to start</p>
+              <p className="text-muted-foreground">Double-click a connection to connect, then click a table to view its data</p>
             </div>
           </div>
         )}
@@ -48,4 +61,5 @@ function App() {
 }
 
 export default App;
+
 
