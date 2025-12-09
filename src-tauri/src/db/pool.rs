@@ -754,37 +754,34 @@ impl ConnectionPoolManager {
                 for change in changes {
                     let result = match change.change_type.as_str() {
                         "update" => {
+                            // Use raw SQL with properly formatted value to preserve types
+                            let formatted_value = format_value_for_sql(&change.new_value);
                             let sql = format!(
-                                "UPDATE \"{}\" SET \"{}\" = $1 WHERE \"{}\" = $2",
-                                table_name, change.column, primary_key_column
+                                "UPDATE \"{}\" SET \"{}\" = {} WHERE \"{}\" = {}",
+                                table_name,
+                                change.column,
+                                formatted_value,
+                                primary_key_column,
+                                format_pk_for_sql(&change.row_id)
                             );
-                            sqlx::query(&sql)
-                                .bind(json_to_string(&change.new_value))
-                                .bind(&change.row_id)
-                                .execute(&mut *tx)
-                                .await
+                            sqlx::query(&sql).execute(&mut *tx).await
                         }
                         "delete" => {
                             let sql = format!(
-                                "DELETE FROM \"{}\" WHERE \"{}\" = $1",
-                                table_name, primary_key_column
+                                "DELETE FROM \"{}\" WHERE \"{}\" = {}",
+                                table_name,
+                                primary_key_column,
+                                format_pk_for_sql(&change.row_id)
                             );
-                            sqlx::query(&sql)
-                                .bind(&change.row_id)
-                                .execute(&mut *tx)
-                                .await
+                            sqlx::query(&sql).execute(&mut *tx).await
                         }
                         "insert" => {
-                            // For inserts, column contains all columns as JSON
-                            // This is a simplified version - real impl would parse values properly
+                            let formatted_value = format_value_for_sql(&change.new_value);
                             let sql = format!(
-                                "INSERT INTO \"{}\" (\"{}\") VALUES ($1)",
-                                table_name, change.column
+                                "INSERT INTO \"{}\" (\"{}\") VALUES ({})",
+                                table_name, change.column, formatted_value
                             );
-                            sqlx::query(&sql)
-                                .bind(json_to_string(&change.new_value))
-                                .execute(&mut *tx)
-                                .await
+                            sqlx::query(&sql).execute(&mut *tx).await
                         }
                         _ => continue,
                     };
@@ -814,25 +811,25 @@ impl ConnectionPoolManager {
                 for change in changes {
                     let result = match change.change_type.as_str() {
                         "update" => {
+                            let formatted_value = format_value_for_sql(&change.new_value);
                             let sql = format!(
-                                "UPDATE `{}` SET `{}` = ? WHERE `{}` = ?",
-                                table_name, change.column, primary_key_column
+                                "UPDATE `{}` SET `{}` = {} WHERE `{}` = {}",
+                                table_name,
+                                change.column,
+                                formatted_value,
+                                primary_key_column,
+                                format_pk_for_sql(&change.row_id)
                             );
-                            sqlx::query(&sql)
-                                .bind(json_to_string(&change.new_value))
-                                .bind(&change.row_id)
-                                .execute(&mut *tx)
-                                .await
+                            sqlx::query(&sql).execute(&mut *tx).await
                         }
                         "delete" => {
                             let sql = format!(
-                                "DELETE FROM `{}` WHERE `{}` = ?",
-                                table_name, primary_key_column
+                                "DELETE FROM `{}` WHERE `{}` = {}",
+                                table_name,
+                                primary_key_column,
+                                format_pk_for_sql(&change.row_id)
                             );
-                            sqlx::query(&sql)
-                                .bind(&change.row_id)
-                                .execute(&mut *tx)
-                                .await
+                            sqlx::query(&sql).execute(&mut *tx).await
                         }
                         _ => continue,
                     };
@@ -862,25 +859,25 @@ impl ConnectionPoolManager {
                 for change in changes {
                     let result = match change.change_type.as_str() {
                         "update" => {
+                            let formatted_value = format_value_for_sql(&change.new_value);
                             let sql = format!(
-                                "UPDATE \"{}\" SET \"{}\" = ? WHERE \"{}\" = ?",
-                                table_name, change.column, primary_key_column
+                                "UPDATE \"{}\" SET \"{}\" = {} WHERE \"{}\" = {}",
+                                table_name,
+                                change.column,
+                                formatted_value,
+                                primary_key_column,
+                                format_pk_for_sql(&change.row_id)
                             );
-                            sqlx::query(&sql)
-                                .bind(json_to_string(&change.new_value))
-                                .bind(&change.row_id)
-                                .execute(&mut *tx)
-                                .await
+                            sqlx::query(&sql).execute(&mut *tx).await
                         }
                         "delete" => {
                             let sql = format!(
-                                "DELETE FROM \"{}\" WHERE \"{}\" = ?",
-                                table_name, primary_key_column
+                                "DELETE FROM \"{}\" WHERE \"{}\" = {}",
+                                table_name,
+                                primary_key_column,
+                                format_pk_for_sql(&change.row_id)
                             );
-                            sqlx::query(&sql)
-                                .bind(&change.row_id)
-                                .execute(&mut *tx)
-                                .await
+                            sqlx::query(&sql).execute(&mut *tx).await
                         }
                         _ => continue,
                     };
@@ -916,7 +913,39 @@ impl ConnectionPoolManager {
     }
 }
 
-/// Helper to convert JSON value to string for binding
+/// Format a JSON value for use directly in SQL (preserves type)
+fn format_value_for_sql(value: &serde_json::Value) -> String {
+    match value {
+        serde_json::Value::Null => "NULL".to_string(),
+        serde_json::Value::Bool(b) => if *b { "TRUE" } else { "FALSE" }.to_string(),
+        serde_json::Value::Number(n) => n.to_string(),
+        serde_json::Value::String(s) => {
+            // Escape single quotes for SQL
+            let escaped = s.replace('\'', "''");
+            format!("'{}'", escaped)
+        }
+        serde_json::Value::Array(_) | serde_json::Value::Object(_) => {
+            // JSON types - escape and quote
+            let json_str = value.to_string().replace('\'', "''");
+            format!("'{}'", json_str)
+        }
+    }
+}
+
+/// Format a primary key value for use in SQL WHERE clause
+fn format_pk_for_sql(pk: &str) -> String {
+    // Try to parse as number first
+    if pk.parse::<i64>().is_ok() || pk.parse::<f64>().is_ok() {
+        pk.to_string()
+    } else {
+        // It's a string (like UUID) - escape and quote
+        let escaped = pk.replace('\'', "''");
+        format!("'{}'", escaped)
+    }
+}
+
+/// Helper to convert JSON value to string for binding (used by MySQL/SQLite)
+#[allow(dead_code)]
 fn json_to_string(value: &serde_json::Value) -> Option<String> {
     match value {
         serde_json::Value::Null => None,
