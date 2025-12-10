@@ -48,7 +48,8 @@ export function Sidebar() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [connectionToDelete, setConnectionToDelete] = useState<Connection | null>(null);
 
-  const { delete: deleteMutation } = useConnections();
+
+  useConnections(); // Keep hook for reactivity
 
   const getConnectionState = (id: string): ConnectionState => {
     return connectionStates[id] || { isConnected: false, isConnecting: false, tables: [], views: [], functions: [], isExpanded: false };

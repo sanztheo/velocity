@@ -317,3 +317,72 @@ export async function getTableIndexes(
   return await invoke("get_table_indexes", { connectionId, tableName });
 }
 
+// Export/Import Commands
+export type ExportFormat = "csv" | "json" | "excel" | "sqldump";
+
+export interface ExportResult {
+  success: boolean;
+  file_path: string;
+  rows_exported: number;
+  message?: string;
+}
+
+export interface CsvPreview {
+  headers: string[];
+  rows: string[][];
+  total_rows: number;
+  detected_delimiter: string;
+}
+
+export interface ColumnMapping {
+  csv_column: string;
+  table_column: string;
+  data_type?: string;
+}
+
+export interface ImportResult {
+  success: boolean;
+  rows_imported: number;
+  errors: string[];
+}
+
+export async function exportTableData(
+  id: string,
+  tableName: string,
+  format: ExportFormat,
+  filePath: string,
+  options?: Record<string, unknown>
+): Promise<ExportResult> {
+  return await invoke("export_table_data", { id, tableName, format, filePath, options });
+}
+
+export async function exportSqlDump(
+  id: string,
+  filePath: string
+): Promise<ExportResult> {
+  return await invoke("export_sql_dump", { id, filePath });
+}
+
+export async function importCsvPreview(
+  filePath: string,
+  previewRows?: number
+): Promise<CsvPreview> {
+  return await invoke("import_csv_preview", { filePath, previewRows });
+}
+
+export async function importCsv(
+  id: string,
+  tableName: string,
+  filePath: string,
+  mappings: ColumnMapping[],
+  delimiter?: string
+): Promise<ImportResult> {
+  return await invoke("import_csv", { id, tableName, filePath, mappings, delimiter });
+}
+
+export async function importSql(
+  id: string,
+  filePath: string
+): Promise<ImportResult> {
+  return await invoke("import_sql", { id, filePath });
+}

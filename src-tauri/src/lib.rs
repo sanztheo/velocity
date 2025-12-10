@@ -1,6 +1,8 @@
 pub mod commands;
 pub mod db;
 pub mod error;
+pub mod export;
+pub mod import;
 pub mod models;
 pub mod ssh;
 pub mod store;
@@ -8,6 +10,8 @@ pub mod store;
 use commands::ai::*;
 use commands::connections::*;
 use commands::database::*;
+use commands::export::*;
+use commands::import::*;
 use commands::keychain::*;
 use commands::ssh::*;
 use db::ConnectionPoolManager;
@@ -27,6 +31,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_keyring::init())
+        .plugin(tauri_plugin_dialog::init())
         .manage(pool_manager)
         .manage(ssh_manager)
         .setup(|app| {
@@ -76,7 +81,13 @@ pub fn run() {
             // SSH Tunnel operations
             create_ssh_tunnel,
             close_ssh_tunnel,
-            get_tunnel_port
+            get_tunnel_port,
+            // Export/Import operations
+            export_table_data,
+            export_sql_dump,
+            import_csv_preview,
+            import_csv,
+            import_sql
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

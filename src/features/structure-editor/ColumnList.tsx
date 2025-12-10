@@ -20,7 +20,7 @@ export function ColumnList({ columns, onAdd, onRemove, onUpdate }: ColumnListPro
         </Button>
       </div>
       
-      <div className="flex-1 overflow-y-auto space-y-1 pr-2">
+      <div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
         {columns.map((col, idx) => (
           <ColumnEditor
             // Use index as key if name is changing, but careful with focus loss

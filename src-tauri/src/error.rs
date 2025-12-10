@@ -31,6 +31,12 @@ pub enum VelocityError {
     
     #[error("Tauri error: {0}")]
     TauriError(String),
+    
+    #[error("Export error: {0}")]
+    Export(String),
+    
+    #[error("Import error: {0}")]
+    Import(String),
 }
 
 impl Serialize for VelocityError {

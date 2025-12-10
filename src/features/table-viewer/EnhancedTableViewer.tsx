@@ -11,12 +11,14 @@ import { useTableEditor } from '@/hooks/useTableEditor';
 import { EditableCell } from '@/components/tables/EditableCell';
 import { SqlPreviewModal } from '@/components/tables/SqlPreviewModal';
 import { ForeignKeysPanel } from '@/components/tables/ForeignKeysPanel';
-import { Loader2, Plus, Save, RotateCcw, Trash2 } from 'lucide-react';
+import { Loader2, Plus, Save, RotateCcw, Trash2, Download, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { executeChanges } from '@/lib/tauri';
+import { ExportDialog } from '@/features/export';
+import { ImportDialog } from '@/features/import';
 
 // New filter components
 import { useTableFilters } from './useTableFilters';
@@ -40,6 +42,8 @@ export function EnhancedTableViewer({ connectionId, tableName }: EnhancedTableVi
   const [error, setError] = useState<string | null>(null);
   const [showSqlPreview, setShowSqlPreview] = useState(false);
   const [isCommitting, setIsCommitting] = useState(false);
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -231,6 +235,18 @@ export function EnhancedTableViewer({ connectionId, tableName }: EnhancedTableVi
 
         <div className="flex-1" />
         
+        {/* Export/Import Buttons */}
+        <Button variant="outline" size="sm" onClick={() => setShowExportDialog(true)}>
+          <Download className="h-4 w-4 mr-1" />
+          Export
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => setShowImportDialog(true)}>
+          <Upload className="h-4 w-4 mr-1" />
+          Import
+        </Button>
+        
+        <div className="h-4 w-px bg-border" />
+        
         {filters.isFiltered && (
           <Badge variant="outline" className="text-xs">
             Filtered
@@ -415,6 +431,23 @@ export function EnhancedTableViewer({ connectionId, tableName }: EnhancedTableVi
         sql={editor.generateSqlPreview(tableName)}
         changeCount={editor.changeCount}
         isExecuting={isCommitting}
+      />
+      
+      {/* Export Dialog */}
+      <ExportDialog
+        isOpen={showExportDialog}
+        onClose={() => setShowExportDialog(false)}
+        connectionId={connectionId}
+        tableName={tableName}
+      />
+      
+      {/* Import Dialog */}
+      <ImportDialog
+        isOpen={showImportDialog}
+        onClose={() => setShowImportDialog(false)}
+        connectionId={connectionId}
+        tableName={tableName}
+        onImportComplete={loadData}
       />
     </div>
   );

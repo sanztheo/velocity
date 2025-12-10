@@ -62,7 +62,7 @@ export function CreateTableDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
+      <DialogContent className="max-w-5xl h-[85vh] flex flex-col p-6">
         <DialogHeader>
           <DialogTitle>Create New Table</DialogTitle>
           <DialogDescription>
@@ -70,19 +70,19 @@ export function CreateTableDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 flex flex-col gap-4 overflow-hidden py-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="table-name">Table Name</Label>
+        <div className="flex-1 flex flex-col gap-6 overflow-hidden py-2">
+          <div className="flex flex-col gap-3">
+            <Label htmlFor="table-name" className="text-base font-semibold text-foreground/80">Table Name</Label>
             <Input
               id="table-name"
               value={tableName}
               onChange={(e) => setTableName(e.target.value)}
               placeholder="e.g. users"
-              className="w-1/3"
+              className="w-1/2 max-w-md h-11 text-lg"
             />
           </div>
 
-          <div className="flex-1 border rounded-md p-4 overflow-hidden flex flex-col">
+          <div className="flex-1 border rounded-xl bg-card/30 p-4 overflow-hidden flex flex-col shadow-sm">
             <ColumnList
               columns={columns}
               onAdd={addColumn}

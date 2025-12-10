@@ -102,13 +102,13 @@
 
 | Fonctionnalité          | TablePlus | Status | Notes              |
 | ----------------------- | --------- | ------ | ------------------ |
-| Export CSV              | ✅        | ❌     |                    |
-| Export JSON             | ✅        | ❌     |                    |
-| Export SQL dump         | ✅        | ❌     | pg_dump, mysqldump |
-| Export Excel            | ✅        | ❌     | xlsx crate         |
-| Import CSV              | ✅        | ❌     |                    |
-| Import SQL              | ✅        | ❌     |                    |
-| Mapping colonnes import | ✅        | ❌     |                    |
+| Export CSV              | ✅        | ✅     | csv crate          |
+| Export JSON             | ✅        | ✅     | serde_json         |
+| Export SQL dump         | ✅        | ✅     | pg_dump, mysqldump |
+| Export Excel            | ✅        | ✅     | rust_xlsxwriter    |
+| Import CSV              | ✅        | ✅     |                    |
+| Import SQL              | ✅        | ✅     |                    |
+| Mapping colonnes import | ✅        | ✅     | Auto-detect        |
 
 #### 🔐 Sécurité et Fiabilité
 

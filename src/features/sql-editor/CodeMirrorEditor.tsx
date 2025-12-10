@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useCallback } from 'react';
 import { EditorView, basicSetup } from 'codemirror';
 import { EditorState } from '@codemirror/state';
 import { sql, PostgreSQL, MySQL, SQLite } from '@codemirror/lang-sql';
@@ -130,15 +130,28 @@ export function CodeMirrorEditor({
 }: CodeMirrorEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
+  
+  // Use refs for callbacks to avoid recreating the editor when callbacks change
+  const onChangeRef = useRef(onChange);
+  const onExecuteRef = useRef(onExecute);
+  
+  // Keep refs updated
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+  
+  useEffect(() => {
+    onExecuteRef.current = onExecute;
+  }, [onExecute]);
 
   // Get dialect based on db type
-  const getDialect = () => {
+  const getDialect = useCallback(() => {
     switch (dbType) {
       case 'mysql': return MySQL;
       case 'sqlite': return SQLite;
       default: return PostgreSQL;
     }
-  };
+  }, [dbType]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -160,25 +173,25 @@ export function CodeMirrorEditor({
       }),
       EditorView.updateListener.of(update => {
         if (update.docChanged) {
-          onChange(update.state.doc.toString());
+          // Use ref to always get the latest onChange
+          onChangeRef.current(update.state.doc.toString());
         }
       }),
       EditorState.readOnly.of(readOnly),
     ];
 
-    if (onExecute) {
-      extensions.push(
-        keymap.of([
-          {
-            key: 'Mod-Enter',
-            run: () => {
-              onExecute();
-              return true;
-            },
+    // Always add the keymap extension, using ref for stable callback
+    extensions.push(
+      keymap.of([
+        {
+          key: 'Mod-Enter',
+          run: () => {
+            onExecuteRef.current?.();
+            return true;
           },
-        ])
-      );
-    }
+        },
+      ])
+    );
 
     const state = EditorState.create({
       doc: value,
@@ -195,8 +208,9 @@ export function CodeMirrorEditor({
     return () => {
       view.destroy();
     };
-  // Recreate when dbType, tables, columns or readOnly change
-  }, [dbType, tables, columns, readOnly, onExecute]);
+  // Only recreate when schema-related props change, NOT on callback changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dbType, tables, columns, readOnly, getDialect]);
 
   // Sync external value changes
   useEffect(() => {
