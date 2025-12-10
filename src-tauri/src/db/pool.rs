@@ -481,6 +481,66 @@ impl ConnectionPoolManager {
         }
     }
 
+    /// List views for a connection (efficient - uses system catalogs)
+    pub async fn list_views(&self, connection_id: &str) -> Result<Vec<String>, VelocityError> {
+        let pool = self
+            .get_pool(connection_id)
+            .await
+            .ok_or_else(|| VelocityError::Connection("Not connected".to_string()))?;
+
+        match pool.as_ref() {
+            DatabasePool::Postgres(pool) => {
+                let rows: Vec<(String,)> = sqlx::query_as(
+                    "SELECT viewname FROM pg_views WHERE schemaname = 'public' ORDER BY viewname",
+                )
+                .fetch_all(pool)
+                .await
+                .map_err(|e| VelocityError::Query(e.to_string()))?;
+                Ok(rows.into_iter().map(|r| r.0).collect())
+            }
+            DatabasePool::MySQL(pool) => {
+                let rows: Vec<(String,)> = sqlx::query_as(
+                    "SELECT TABLE_NAME FROM information_schema.VIEWS WHERE TABLE_SCHEMA = DATABASE() ORDER BY TABLE_NAME"
+                ).fetch_all(pool).await.map_err(|e| VelocityError::Query(e.to_string()))?;
+                Ok(rows.into_iter().map(|r| r.0).collect())
+            }
+            DatabasePool::SQLite(pool) => {
+                let rows: Vec<(String,)> = sqlx::query_as(
+                    "SELECT name FROM sqlite_master WHERE type='view' ORDER BY name",
+                )
+                .fetch_all(pool)
+                .await
+                .map_err(|e| VelocityError::Query(e.to_string()))?;
+                Ok(rows.into_iter().map(|r| r.0).collect())
+            }
+            _ => Ok(vec![]),
+        }
+    }
+
+    /// List functions for a connection (efficient - uses system catalogs)
+    pub async fn list_functions(&self, connection_id: &str) -> Result<Vec<String>, VelocityError> {
+        let pool = self
+            .get_pool(connection_id)
+            .await
+            .ok_or_else(|| VelocityError::Connection("Not connected".to_string()))?;
+
+        match pool.as_ref() {
+            DatabasePool::Postgres(pool) => {
+                let rows: Vec<(String,)> = sqlx::query_as(
+                    "SELECT routine_name FROM information_schema.routines WHERE routine_schema = 'public' ORDER BY routine_name"
+                ).fetch_all(pool).await.map_err(|e| VelocityError::Query(e.to_string()))?;
+                Ok(rows.into_iter().map(|r| r.0).collect())
+            }
+            DatabasePool::MySQL(pool) => {
+                let rows: Vec<(String,)> = sqlx::query_as(
+                    "SELECT ROUTINE_NAME FROM information_schema.ROUTINES WHERE ROUTINE_SCHEMA = DATABASE() ORDER BY ROUTINE_NAME"
+                ).fetch_all(pool).await.map_err(|e| VelocityError::Query(e.to_string()))?;
+                Ok(rows.into_iter().map(|r| r.0).collect())
+            }
+            _ => Ok(vec![]),
+        }
+    }
+
     pub async fn get_table_schema(
         &self,
         connection_id: &str,

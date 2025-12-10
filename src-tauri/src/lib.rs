@@ -43,6 +43,8 @@ pub fn run() {
             is_connected,
             list_databases,
             list_tables,
+            list_views,
+            list_functions,
             get_table_schema,
             get_table_data,
             execute_changes,

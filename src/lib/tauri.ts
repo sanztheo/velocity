@@ -39,6 +39,14 @@ export async function listTables(id: string): Promise<string[]> {
   return await invoke("list_tables", { id });
 }
 
+export async function listViews(id: string): Promise<string[]> {
+  return await invoke("list_views", { id });
+}
+
+export async function listFunctions(id: string): Promise<string[]> {
+  return await invoke("list_functions", { id });
+}
+
 // Table operations
 export interface ColumnInfo {
   name: string;

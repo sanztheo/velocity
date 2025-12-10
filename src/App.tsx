@@ -3,6 +3,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { useAppStore } from "@/stores/app.store";
 import { Toaster } from "@/components/ui/sonner";
 import { TableViewer } from "@/components/tables/TableViewer";
+import { SpotlightSearch } from "@/features/spotlight";
 
 function App() {
   const { theme, activeTabId, tabs } = useAppStore();
@@ -50,11 +51,14 @@ function App() {
           <div className="flex h-full items-center justify-center">
             <div className="text-center">
               <h2 className="text-xl font-semibold mb-2 text-foreground">Welcome to Velocity</h2>
-              <p className="text-muted-foreground">Double-click a connection to connect, then click a table to view its data</p>
+              <p className="text-muted-foreground">
+                Press <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">⌘K</kbd> to search, or double-click a connection
+              </p>
             </div>
           </div>
         )}
       </AppLayout>
+      <SpotlightSearch />
       <Toaster position="top-right" />
     </>
   );

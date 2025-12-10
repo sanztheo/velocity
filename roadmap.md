@@ -32,11 +32,11 @@
 | -------------------------------- | --------- | ------ | --------------- |
 | Liste databases                  | ✅        | ✅     |                 |
 | Liste tables                     | ✅        | ✅     |                 |
-| Liste vues                       | ✅        | ❌     |                 |
-| Liste fonctions                  | ✅        | ❌     |                 |
+| Liste vues                       | ✅        | ✅     | pg_views query  |
+| Liste fonctions                  | ✅        | ✅     | routines query  |
 | Liste colonnes/indexes           | ✅        | ✅     | Schema explorer |
-| Sidebar avec tree view           | ✅        | ✅     |                 |
-| Recherche rapide "Open Anything" | ✅        | ❌     | Cmd+K           |
+| Sidebar avec tree view           | ✅        | ✅     | Tables/Views/Fn |
+| Recherche rapide "Open Anything" | ✅        | ✅     | ⌘K / Ctrl+K     |
 | Preview relations/FK             | ✅        | ❌     |                 |
 
 #### ✏️ Édition de Données
@@ -141,7 +141,7 @@
 | Catégorie       | ✅ Fait | 🔄 En cours | ❌ À faire |
 | --------------- | ------- | ----------- | ---------- |
 | Connexions      | 14      | 0           | 1          |
-| Navigation      | 4       | 0           | 4          |
+| Navigation      | 7       | 0           | 1          |
 | Édition Données | 9       | 0           | 0          |
 | Éditeur SQL     | 0       | 1           | 11         |
 | Filtrage        | 1       | 0           | 8          |
@@ -149,7 +149,7 @@
 | Import/Export   | 0       | 0           | 7          |
 | Sécurité        | 1       | 0           | 5          |
 | UX              | 8       | 1           | 3          |
-| **TOTAL**       | **38**  | **2**       | **45**     |
+| **TOTAL**       | **41**  | **2**       | **42**     |
 
 ### 6.3 Fonctionnalités Velocity Uniques (différenciation)
 

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useAppStore } from "@/stores/app.store";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Plus, Database, MoreVertical, Trash, Edit, Star, ChevronRight, ChevronDown, Table, Loader2, Unplug, Plug } from "lucide-react";
+import { Plus, Database, MoreVertical, Trash, Edit, Star, ChevronRight, ChevronDown, Table, Loader2, Unplug, Plug, Eye, FunctionSquare } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog,
@@ -21,13 +21,15 @@ import {
 import { ConnectionForm } from "@/components/connections/ConnectionForm";
 import { useConnections } from "@/hooks/useConnections";
 import { Connection } from "@/types";
-import { connectToDatabase, disconnectFromDatabase, listTables } from "@/lib/tauri";
+import { connectToDatabase, disconnectFromDatabase, listTables, listViews, listFunctions } from "@/lib/tauri";
 import { toast } from "sonner";
 
 interface ConnectionState {
   isConnected: boolean;
   isConnecting: boolean;
   tables: string[];
+  views: string[];
+  functions: string[];
   isExpanded: boolean;
 }
 
@@ -42,7 +44,7 @@ export function Sidebar() {
   const { delete: deleteMutation } = useConnections();
 
   const getConnectionState = (id: string): ConnectionState => {
-    return connectionStates[id] || { isConnected: false, isConnecting: false, tables: [], isExpanded: false };
+    return connectionStates[id] || { isConnected: false, isConnecting: false, tables: [], views: [], functions: [], isExpanded: false };
   };
 
   const handleConnect = async (conn: Connection) => {
@@ -65,11 +67,15 @@ export function Sidebar() {
 
     try {
       await connectToDatabase(conn.id);
-      const tables = await listTables(conn.id);
+      const [tables, views, functions] = await Promise.all([
+        listTables(conn.id),
+        listViews(conn.id),
+        listFunctions(conn.id),
+      ]);
       
       setConnectionStates(prev => ({
         ...prev,
-        [conn.id]: { isConnected: true, isConnecting: false, tables, isExpanded: true }
+        [conn.id]: { isConnected: true, isConnecting: false, tables, views, functions, isExpanded: true }
       }));
       
       setActiveConnection(conn.id);
@@ -77,7 +83,7 @@ export function Sidebar() {
     } catch (error) {
       setConnectionStates(prev => ({
         ...prev,
-        [conn.id]: { isConnected: false, isConnecting: false, tables: [], isExpanded: false }
+        [conn.id]: { isConnected: false, isConnecting: false, tables: [], views: [], functions: [], isExpanded: false }
       }));
       toast.error(`Failed to connect: ${error}`);
     }
@@ -89,7 +95,7 @@ export function Sidebar() {
       await disconnectFromDatabase(conn.id);
       setConnectionStates(prev => ({
         ...prev,
-        [conn.id]: { isConnected: false, isConnecting: false, tables: [], isExpanded: false }
+        [conn.id]: { isConnected: false, isConnecting: false, tables: [], views: [], functions: [], isExpanded: false }
       }));
       toast.success(`Disconnected from ${conn.name}`);
     } catch (error) {
@@ -211,22 +217,61 @@ export function Sidebar() {
                   </DropdownMenu>
                 </div>
                 
-                {/* Tables list */}
+                {/* Database objects list */}
                 {state.isConnected && state.isExpanded && (
                   <div className="ml-4 pl-2 border-l border-sidebar-border">
-                    {state.tables.length === 0 ? (
-                      <div className="text-xs text-muted-foreground py-1 px-2">No tables found</div>
-                    ) : (
-                      state.tables.map((table) => (
-                        <div
-                          key={table}
-                          className="flex items-center gap-2 text-xs py-1 px-2 rounded cursor-pointer text-sidebar-foreground hover:bg-sidebar-hover hover:text-sidebar-active-foreground"
-                          onClick={() => handleTableClick(conn, table)}
-                        >
-                          <Table className="h-3 w-3 text-muted-foreground" />
-                          <span className="truncate">{table}</span>
-                        </div>
-                      ))
+                    {/* Tables */}
+                    {state.tables.length > 0 && (
+                      <>
+                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground py-1 px-2 font-medium">Tables</div>
+                        {state.tables.map((table) => (
+                          <div
+                            key={table}
+                            className="flex items-center gap-2 text-xs py-1 px-2 rounded cursor-pointer text-sidebar-foreground hover:bg-sidebar-hover hover:text-sidebar-active-foreground"
+                            onClick={() => handleTableClick(conn, table)}
+                          >
+                            <Table className="h-3 w-3 text-muted-foreground" />
+                            <span className="truncate">{table}</span>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                    
+                    {/* Views */}
+                    {state.views.length > 0 && (
+                      <>
+                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground py-1 px-2 font-medium mt-2">Views</div>
+                        {state.views.map((view) => (
+                          <div
+                            key={view}
+                            className="flex items-center gap-2 text-xs py-1 px-2 rounded cursor-pointer text-sidebar-foreground hover:bg-sidebar-hover hover:text-sidebar-active-foreground"
+                            onClick={() => handleTableClick(conn, view)}
+                          >
+                            <Eye className="h-3 w-3 text-blue-500" />
+                            <span className="truncate">{view}</span>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                    
+                    {/* Functions */}
+                    {state.functions.length > 0 && (
+                      <>
+                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground py-1 px-2 font-medium mt-2">Functions</div>
+                        {state.functions.map((fn) => (
+                          <div
+                            key={fn}
+                            className="flex items-center gap-2 text-xs py-1 px-2 rounded cursor-pointer text-sidebar-foreground hover:bg-sidebar-hover hover:text-sidebar-active-foreground"
+                          >
+                            <FunctionSquare className="h-3 w-3 text-purple-500" />
+                            <span className="truncate">{fn}</span>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                    
+                    {state.tables.length === 0 && state.views.length === 0 && state.functions.length === 0 && (
+                      <div className="text-xs text-muted-foreground py-1 px-2">No objects found</div>
                     )}
                   </div>
                 )}

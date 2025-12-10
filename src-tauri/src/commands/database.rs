@@ -64,6 +64,24 @@ pub async fn list_tables(
     pool_manager.list_tables(&id).await
 }
 
+/// List views for a connection
+#[tauri::command]
+pub async fn list_views(
+    id: String,
+    pool_manager: State<'_, Arc<ConnectionPoolManager>>,
+) -> Result<Vec<String>, VelocityError> {
+    pool_manager.list_views(&id).await
+}
+
+/// List functions for a connection
+#[tauri::command]
+pub async fn list_functions(
+    id: String,
+    pool_manager: State<'_, Arc<ConnectionPoolManager>>,
+) -> Result<Vec<String>, VelocityError> {
+    pool_manager.list_functions(&id).await
+}
+
 /// Get table schema (columns)
 #[tauri::command]
 pub async fn get_table_schema(
