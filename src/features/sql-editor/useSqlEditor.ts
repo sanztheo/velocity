@@ -56,9 +56,14 @@ export function useSqlEditor({ connectionId, initialSql = '' }: UseSqlEditorProp
         const result = await executeQuery(connectionId, statement);
         const executionTime = performance.now() - stmtStart;
         
+        // Extract table name from SQL (FROM tablename or UPDATE tablename or INTO tablename)
+        const tableMatch = statement.match(/(?:FROM|UPDATE|INTO|JOIN)\s+["`]?(\w+)["`]?/i);
+        const tableName = tableMatch ? tableMatch[1] : undefined;
+        
         newResults.push({
           ...result,
           executionTime,
+          tableName,
         });
       }
 

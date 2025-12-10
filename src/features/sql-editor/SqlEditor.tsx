@@ -20,7 +20,8 @@ import {
   AlertCircle,
   Table,
   FileQuestion,
-  Sparkles
+  Sparkles,
+  ArrowUpRight
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -36,7 +37,7 @@ export function SqlEditor({ connectionId, initialSql = '' }: SqlEditorProps) {
   const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
   const [isLoadingAi, setIsLoadingAi] = useState(false);
   
-  const { connections } = useAppStore();
+  const { connections, addTab } = useAppStore();
   const connection = connections.find(c => c.id === connectionId);
   const dbType = (connection?.config?.type?.toLowerCase() || 'postgresql') as 'postgresql' | 'mysql' | 'sqlite';
 
@@ -90,6 +91,17 @@ export function SqlEditor({ connectionId, initialSql = '' }: SqlEditorProps) {
     setAiSuggestions([]);
   }, [editor]);
 
+  // Open table at specific row
+  const openTableAtRow = useCallback((tableName: string, _row: unknown[], _columns: string[]) => {
+    // TODO: Could add filter based on primary key to highlight the row
+    addTab({
+      id: `${connectionId}-${tableName}`,
+      title: tableName,
+      type: 'table',
+      connectionId,
+    });
+  }, [connectionId, addTab]);
+
   // Render result table
   const renderResultTable = useCallback((result: QueryResult, _index: number) => {
     if (result.error) {
@@ -115,6 +127,7 @@ export function SqlEditor({ connectionId, initialSql = '' }: SqlEditorProps) {
         <table className="w-full text-xs">
           <thead className="sticky top-0 bg-secondary">
             <tr>
+              {result.tableName && <th className="w-8 px-2 py-2 border-b border-border"></th>}
               {result.columns.map((col, i) => (
                 <th 
                   key={i} 
@@ -129,8 +142,19 @@ export function SqlEditor({ connectionId, initialSql = '' }: SqlEditorProps) {
             {result.rows.map((row, rowIdx) => (
               <tr 
                 key={rowIdx}
-                className="hover:bg-secondary/50 border-b border-border/50"
+                className="hover:bg-secondary/50 border-b border-border/50 group"
               >
+                {result.tableName && (
+                  <td className="px-2 py-1">
+                    <button
+                      onClick={() => openTableAtRow(result.tableName!, row as unknown[], result.columns)}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+                      title={`Open ${result.tableName}`}
+                    >
+                      <ArrowUpRight className="h-3 w-3" />
+                    </button>
+                  </td>
+                )}
                 {(row as unknown[]).map((cell, cellIdx) => (
                   <td 
                     key={cellIdx}
@@ -149,7 +173,7 @@ export function SqlEditor({ connectionId, initialSql = '' }: SqlEditorProps) {
         </table>
       </div>
     );
-  }, []);
+  }, [openTableAtRow]);
 
   return (
     <div className="flex flex-col h-full">
@@ -346,7 +370,7 @@ export function SqlEditor({ connectionId, initialSql = '' }: SqlEditorProps) {
                         result.error && "text-red-500"
                       )}
                     >
-                      Result {i + 1}
+                      {result.tableName || `Result ${i + 1}`}
                       <Badge variant="outline" className="ml-1 text-[10px]">
                         {result.rowCount}
                       </Badge>

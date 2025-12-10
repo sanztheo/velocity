@@ -2,9 +2,9 @@ import { useRef, useEffect } from 'react';
 import { EditorView, basicSetup } from 'codemirror';
 import { EditorState } from '@codemirror/state';
 import { sql, PostgreSQL, MySQL, SQLite } from '@codemirror/lang-sql';
-import { oneDark } from '@codemirror/theme-one-dark';
 import { keymap } from '@codemirror/view';
-import { autocompletion, CompletionContext, CompletionResult } from '@codemirror/autocomplete';
+import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
+import { tags } from '@lezer/highlight';
 
 interface CodeMirrorEditorProps {
   value: string;
@@ -15,6 +15,105 @@ interface CodeMirrorEditorProps {
   dbType?: 'postgresql' | 'mysql' | 'sqlite';
   className?: string;
 }
+
+// Custom dark theme matching the app design (#191919, #1F1F1F)
+const customDarkTheme = EditorView.theme({
+  '&': {
+    backgroundColor: '#191919',
+    color: '#D1D1D1',
+    height: '100%',
+    fontSize: '13px',
+  },
+  '.cm-content': {
+    caretColor: '#7C3AED',
+    fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace',
+  },
+  '.cm-cursor, .cm-dropCursor': {
+    borderLeftColor: '#7C3AED',
+  },
+  '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection': {
+    backgroundColor: '#2A2A2A',
+  },
+  '.cm-panels': {
+    backgroundColor: '#1F1F1F',
+    color: '#D1D1D1',
+  },
+  '.cm-panels.cm-panels-top': {
+    borderBottom: '1px solid #2A2A2A',
+  },
+  '.cm-panels.cm-panels-bottom': {
+    borderTop: '1px solid #2A2A2A',
+  },
+  '.cm-searchMatch': {
+    backgroundColor: '#7C3AED33',
+  },
+  '.cm-searchMatch.cm-searchMatch-selected': {
+    backgroundColor: '#7C3AED66',
+  },
+  '.cm-activeLine': {
+    backgroundColor: '#1F1F1F',
+  },
+  '.cm-selectionMatch': {
+    backgroundColor: '#2A2A2A',
+  },
+  '.cm-gutters': {
+    backgroundColor: '#191919',
+    color: '#7D7D7D',
+    border: 'none',
+    borderRight: '1px solid #2A2A2A',
+  },
+  '.cm-activeLineGutter': {
+    backgroundColor: '#1F1F1F',
+  },
+  '.cm-foldPlaceholder': {
+    backgroundColor: '#2A2A2A',
+    border: 'none',
+    color: '#7D7D7D',
+  },
+  '.cm-tooltip': {
+    backgroundColor: '#1F1F1F',
+    border: '1px solid #2A2A2A',
+    color: '#D1D1D1',
+  },
+  '.cm-tooltip .cm-tooltip-arrow:before': {
+    borderTopColor: '#2A2A2A',
+    borderBottomColor: '#2A2A2A',
+  },
+  '.cm-tooltip .cm-tooltip-arrow:after': {
+    borderTopColor: '#1F1F1F',
+    borderBottomColor: '#1F1F1F',
+  },
+  '.cm-tooltip-autocomplete': {
+    '& > ul > li[aria-selected]': {
+      backgroundColor: '#2A2A2A',
+      color: '#D1D1D1',
+    },
+  },
+  '.cm-scroller': {
+    overflow: 'auto',
+  },
+}, { dark: true });
+
+// Syntax highlighting
+const customHighlightStyle = HighlightStyle.define([
+  { tag: tags.keyword, color: '#7C3AED' },
+  { tag: tags.operator, color: '#7D7D7D' },
+  { tag: tags.special(tags.variableName), color: '#E879F9' },
+  { tag: tags.typeName, color: '#22D3EE' },
+  { tag: tags.atom, color: '#22D3EE' },
+  { tag: tags.number, color: '#F472B6' },
+  { tag: tags.definition(tags.variableName), color: '#D1D1D1' },
+  { tag: tags.string, color: '#4ADE80' },
+  { tag: tags.special(tags.string), color: '#4ADE80' },
+  { tag: tags.comment, color: '#7D7D7D', fontStyle: 'italic' },
+  { tag: tags.variableName, color: '#D1D1D1' },
+  { tag: tags.tagName, color: '#E879F9' },
+  { tag: tags.attributeName, color: '#22D3EE' },
+  { tag: tags.className, color: '#22D3EE' },
+  { tag: tags.propertyName, color: '#7C3AED' },
+  { tag: tags.punctuation, color: '#7D7D7D' },
+  { tag: tags.bracket, color: '#7D7D7D' },
+]);
 
 export function CodeMirrorEditor({
   value,
@@ -37,43 +136,24 @@ export function CodeMirrorEditor({
     }
   };
 
-  // Custom autocomplete for tables and columns
-  const tableColumnCompletion = (context: CompletionContext): CompletionResult | null => {
-    const word = context.matchBefore(/\w*/);
-    if (!word || (word.from === word.to && !context.explicit)) return null;
-
-    const options = [
-      // Tables
-      ...tables.map(table => ({
-        label: table,
-        type: 'class' as const,
-        info: 'Table',
-      })),
-      // Columns for each table
-      ...Object.entries(columns).flatMap(([table, cols]) =>
-        cols.map(col => ({
-          label: col,
-          type: 'property' as const,
-          info: `Column (${table})`,
-        }))
-      ),
-    ];
-
-    return {
-      from: word.from,
-      options,
-    };
-  };
-
   useEffect(() => {
     if (!containerRef.current) return;
+
+    // Build schema for SQL autocomplete
+    const schema: Record<string, string[]> = {};
+    tables.forEach(table => {
+      schema[table] = columns[table] || [];
+    });
 
     // Create extensions
     const extensions = [
       basicSetup,
-      oneDark,
-      sql({ dialect: getDialect() }),
-      autocompletion({ override: [tableColumnCompletion] }),
+      customDarkTheme,
+      syntaxHighlighting(customHighlightStyle),
+      sql({ 
+        dialect: getDialect(),
+        schema: schema,
+      }),
       EditorView.updateListener.of(update => {
         if (update.docChanged) {
           onChange(update.state.doc.toString());
@@ -88,22 +168,6 @@ export function CodeMirrorEditor({
           },
         },
       ]),
-      EditorView.theme({
-        '&': {
-          height: '100%',
-          fontSize: '13px',
-        },
-        '.cm-scroller': {
-          overflow: 'auto',
-          fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace',
-        },
-        '.cm-content': {
-          caretColor: '#528bff',
-        },
-        '&.cm-focused .cm-cursor': {
-          borderLeftColor: '#528bff',
-        },
-      }),
     ];
 
     const state = EditorState.create({
@@ -121,8 +185,8 @@ export function CodeMirrorEditor({
     return () => {
       view.destroy();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dbType]); // Only recreate on dbType change
+  // Recreate when dbType, tables or columns change
+  }, [dbType, tables, columns]);
 
   // Sync external value changes
   useEffect(() => {
@@ -140,7 +204,8 @@ export function CodeMirrorEditor({
   return (
     <div 
       ref={containerRef} 
-      className={`h-full w-full overflow-hidden rounded-md border border-border bg-[#282c34] ${className}`}
+      className={`h-full w-full overflow-hidden rounded-md border border-[#2A2A2A] bg-[#191919] ${className}`}
     />
   );
 }
+

@@ -5,6 +5,7 @@ export interface QueryResult {
   rowCount: number;
   executionTime: number;
   error?: string;
+  tableName?: string; // Extracted from SQL (e.g., FROM users)
 }
 
 export interface QueryHistory {
