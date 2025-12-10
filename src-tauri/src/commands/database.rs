@@ -164,3 +164,38 @@ pub async fn execute_changes(
         .execute_changes(&connection_id, &table_name, &primary_key_column, changes)
         .await
 }
+
+/// Query result for SQL editor
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QueryResultData {
+    pub columns: Vec<String>,
+    pub rows: Vec<Vec<serde_json::Value>>,
+    pub row_count: i64,
+}
+
+/// Execute a raw SQL query
+#[tauri::command]
+pub async fn execute_query(
+    connection_id: String,
+    sql: String,
+    pool_manager: State<'_, Arc<ConnectionPoolManager>>,
+) -> Result<QueryResultData, VelocityError> {
+    pool_manager.execute_query(&connection_id, &sql).await
+}
+
+/// Get query execution plan (EXPLAIN)
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExplainResult {
+    pub plan: Vec<String>,
+}
+
+#[tauri::command]
+pub async fn explain_query(
+    connection_id: String,
+    sql: String,
+    pool_manager: State<'_, Arc<ConnectionPoolManager>>,
+) -> Result<ExplainResult, VelocityError> {
+    pool_manager.explain_query(&connection_id, &sql).await
+}

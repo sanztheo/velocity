@@ -4,6 +4,7 @@ import { useAppStore } from "@/stores/app.store";
 import { Toaster } from "@/components/ui/sonner";
 import { TableViewer } from "@/components/tables/TableViewer";
 import { SpotlightSearch } from "@/features/spotlight";
+import { SqlEditor } from "@/features/sql-editor";
 
 function App() {
   const { theme, activeTabId, tabs } = useAppStore();
@@ -34,11 +35,11 @@ function App() {
                 tableName={activeTab.title}
               />
             )}
-            {activeTab.type === 'query' && (
-              <div className="p-6">
-                <h1 className="text-2xl font-bold mb-2 text-foreground">{activeTab.title}</h1>
-                <div className="text-muted-foreground">Query Editor - Coming soon</div>
-              </div>
+            {activeTab.type === 'query' && activeTab.connectionId && (
+              <SqlEditor 
+                connectionId={activeTab.connectionId}
+                initialSql={activeTab.sql || ''}
+              />
             )}
             {activeTab.type === 'structure' && (
               <div className="p-6">

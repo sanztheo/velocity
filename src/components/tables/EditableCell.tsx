@@ -114,7 +114,7 @@ function parseValue(inputValue: string, dataType: string, originalValue: unknown
 
 export function EditableCell({
   value,
-  column,
+  column: _column,
   dataType,
   isEditing,
   isModified,

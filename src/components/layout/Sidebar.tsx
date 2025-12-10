@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useAppStore } from "@/stores/app.store";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Plus, Database, MoreVertical, Trash, Edit, Star, ChevronRight, ChevronDown, Table, Loader2, Unplug, Plug, Eye, FunctionSquare } from "lucide-react";
+import { Plus, Database, MoreVertical, Trash, Edit, Star, ChevronRight, ChevronDown, Table, Loader2, Unplug, Plug, Eye, FunctionSquare, Terminal } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog,
@@ -201,6 +201,19 @@ export function Sidebar() {
                       ) : (
                         <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleConnect(conn); }}>
                           <Plug className="h-3 w-3 mr-2" /> Connect
+                        </DropdownMenuItem>
+                      )}
+                      {state.isConnected && (
+                        <DropdownMenuItem onClick={(e) => { 
+                          e.stopPropagation(); 
+                          addTab({
+                            id: `query-${conn.id}-${Date.now()}`,
+                            title: 'New Query',
+                            type: 'query',
+                            connectionId: conn.id,
+                          });
+                        }}>
+                          <Terminal className="h-3 w-3 mr-2" /> New Query
                         </DropdownMenuItem>
                       )}
                       <DropdownMenuSeparator />

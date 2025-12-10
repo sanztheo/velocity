@@ -116,3 +116,28 @@ export async function executeChanges(
     primaryKeyColumn 
   });
 }
+
+// Query execution for SQL Editor
+export interface QueryResultData {
+  columns: string[];
+  rows: unknown[][];
+  rowCount: number;
+}
+
+export async function executeQuery(
+  connectionId: string,
+  sql: string
+): Promise<QueryResultData> {
+  return await invoke("execute_query", { connectionId, sql });
+}
+
+export interface ExplainResult {
+  plan: string[];
+}
+
+export async function explainQuery(
+  connectionId: string,
+  sql: string
+): Promise<ExplainResult> {
+  return await invoke("explain_query", { connectionId, sql });
+}

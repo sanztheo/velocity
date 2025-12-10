@@ -1,4 +1,4 @@
 pub mod pool;
+pub mod query;
 
-pub use pool::{ConnectionPoolManager, ColumnInfo, TableData};
-
+pub use pool::{ColumnInfo, ConnectionPoolManager, DatabasePool, TableData};

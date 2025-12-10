@@ -1,6 +1,6 @@
 use crate::error::VelocityError;
 use crate::models::connection::{Connection, ConnectionConfig};
-use sqlx::{MySql, Pool, Postgres, Sqlite};
+use sqlx::{Column, MySql, Pool, Postgres, Row, Sqlite};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;

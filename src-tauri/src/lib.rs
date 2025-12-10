@@ -49,6 +49,8 @@ pub fn run() {
             get_table_data,
             get_table_foreign_keys,
             execute_changes,
+            execute_query,
+            explain_query,
             // Keychain operations
             save_password,
             get_password,

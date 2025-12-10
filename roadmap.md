@@ -28,16 +28,18 @@
 
 #### 🗂️ Navigation et Exploration
 
-| Fonctionnalité                   | TablePlus | Status | Notes           |
-| -------------------------------- | --------- | ------ | --------------- |
-| Liste databases                  | ✅        | ✅     |                 |
-| Liste tables                     | ✅        | ✅     |                 |
-| Liste vues                       | ✅        | ✅     | pg_views query  |
-| Liste fonctions                  | ✅        | ✅     | routines query  |
-| Liste colonnes/indexes           | ✅        | ✅     | Schema explorer |
-| Sidebar avec tree view           | ✅        | ✅     | Tables/Views/Fn |
-| Recherche rapide "Open Anything" | ✅        | ✅     | ⌘K / Ctrl+K     |
-| Preview relations/FK             | ✅        | ❌     |                 |
+| Fonctionnalité                   | TablePlus | Status | Notes            |
+| -------------------------------- | --------- | ------ | ---------------- |
+| Fonctionnalité                   | TablePlus | Status | Notes            |
+| -------------------------------- | --------- | ------ | ---------------- |
+| Liste databases                  | ✅        | ✅     |                  |
+| Liste tables                     | ✅        | ✅     |                  |
+| Liste vues                       | ✅        | ✅     | pg_views query   |
+| Liste fonctions                  | ✅        | ✅     | routines query   |
+| Liste colonnes/indexes           | ✅        | ✅     | Schema explorer  |
+| Sidebar avec tree view           | ✅        | ✅     | Tables/Views/Fn  |
+| Recherche rapide "Open Anything" | ✅        | ✅     | ⌘K / Ctrl+K      |
+| Preview relations/FK             | ✅        | ✅     | ForeignKeysPanel |
 
 #### ✏️ Édition de Données
 
@@ -55,20 +57,20 @@
 
 #### 🖥️ Éditeur SQL
 
-| Fonctionnalité              | TablePlus | Status | Notes         |
-| --------------------------- | --------- | ------ | ------------- |
-| Éditeur SQL                 | ✅        | ❌     | CodeMirror    |
-| Coloration syntaxique       | ✅        | ❌     | lang-sql      |
-| Auto-complétion tables      | ✅        | ❌     |               |
-| Auto-complétion colonnes    | ✅        | ❌     |               |
-| Auto-complétion mots-clés   | ✅        | ❌     |               |
-| Exécution query (Cmd+Enter) | ✅        | ❌     |               |
-| Exécution multi-statements  | ✅        | ❌     | Split par ;   |
-| Résultats en onglets        | ✅        | 🔄     |               |
-| Historique requêtes         | ✅        | ❌     | Stocké JSON   |
-| Requêtes favorites          | ✅        | ❌     |               |
-| Format/Beautify SQL         | ✅        | ❌     | sql-formatter |
-| Explain query plan          | ✅        | ❌     |               |
+| Fonctionnalité              | TablePlus | Status | Notes            |
+| --------------------------- | --------- | ------ | ---------------- |
+| Éditeur SQL                 | ✅        | ✅     | CodeMirror       |
+| Coloration syntaxique       | ✅        | ✅     | lang-sql         |
+| Auto-complétion tables      | ✅        | ✅     | Custom completer |
+| Auto-complétion colonnes    | ✅        | ✅     | Custom completer |
+| Auto-complétion mots-clés   | ✅        | ✅     | PostgreSQL/MySQL |
+| Exécution query (Cmd+Enter) | ✅        | ✅     | ⌘↵ shortcut      |
+| Exécution multi-statements  | ✅        | ✅     | Split par ;      |
+| Résultats en onglets        | ✅        | ✅     | Tabs component   |
+| Historique requêtes         | ✅        | ✅     | localStorage     |
+| Requêtes favorites          | ✅        | ✅     | Star toggle      |
+| Format/Beautify SQL         | ✅        | ✅     | sql-formatter    |
+| Explain query plan          | ✅        | ✅     | EXPLAIN ANALYZE  |
 
 #### 🔍 Filtrage et Recherche
 
@@ -141,15 +143,15 @@
 | Catégorie       | ✅ Fait | 🔄 En cours | ❌ À faire |
 | --------------- | ------- | ----------- | ---------- |
 | Connexions      | 14      | 0           | 1          |
-| Navigation      | 7       | 0           | 1          |
+| Navigation      | 8       | 0           | 0          |
 | Édition Données | 9       | 0           | 0          |
-| Éditeur SQL     | 0       | 1           | 11         |
+| Éditeur SQL     | 12      | 0           | 0          |
 | Filtrage        | 1       | 0           | 8          |
 | Structure       | 1       | 0           | 6          |
 | Import/Export   | 0       | 0           | 7          |
 | Sécurité        | 1       | 0           | 5          |
 | UX              | 8       | 1           | 3          |
-| **TOTAL**       | **41**  | **2**       | **42**     |
+| **TOTAL**       | **54**  | **1**       | **30**     |
 
 ### 6.3 Fonctionnalités Velocity Uniques (différenciation)
 
