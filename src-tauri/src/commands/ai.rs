@@ -31,9 +31,9 @@ pub async fn ai_sql_complete(
     let client = reqwest::Client::new();
 
     let system_prompt = format!(
-        "You are a SQL assistant for {}. Given partial SQL and context, suggest 3-5 completions. \
+        "You are a SQL assistant for {}. Given partial SQL and context, suggest 3-5 SQL completions. \
         Available tables: {}. Available columns: {}. \
-        Return ONLY a JSON array of completion strings, no explanation.",
+        You MUST respond with a JSON object with a 'suggestions' key containing an array of SQL strings.",
         request.db_type,
         request.table_context.join(", "),
         request.column_context.join(", ")
@@ -47,8 +47,9 @@ pub async fn ai_sql_complete(
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
         ],
+        "response_format": { "type": "json_object" },
         "temperature": 0.3,
-        "max_tokens": 200
+        "max_tokens": 300
     });
 
     let response = client
@@ -75,17 +76,18 @@ pub async fn ai_sql_complete(
 
     let content = json["choices"][0]["message"]["content"]
         .as_str()
-        .unwrap_or("[]");
+        .unwrap_or("{}");
 
-    // Parse the JSON array of suggestions
-    let suggestions: Vec<String> = serde_json::from_str(content).unwrap_or_else(|_| {
-        // If parsing fails, try to extract suggestions from text
-        content
-            .lines()
-            .filter(|l| !l.is_empty())
-            .map(|l| l.trim().to_string())
-            .collect()
-    });
+    // Parse the JSON object with suggestions key
+    let parsed: serde_json::Value = serde_json::from_str(content).unwrap_or(serde_json::json!({}));
+    let suggestions: Vec<String> = parsed["suggestions"]
+        .as_array()
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect()
+        })
+        .unwrap_or_default();
 
     Ok(AiCompletionResponse { suggestions })
 }
