@@ -98,7 +98,8 @@ impl DatabaseFactory {
 
                 let pool = sqlx::mysql::MySqlPoolOptions::new()
                     .max_connections(5)
-                    .acquire_timeout(std::time::Duration::from_secs(30))
+                    .min_connections(1) // Pre-establish at least one connection
+                    .acquire_timeout(std::time::Duration::from_secs(120)) // 2 minutes for slow remote DBs
                     .idle_timeout(std::time::Duration::from_secs(600))
                     .connect_with(opts)
                     .await

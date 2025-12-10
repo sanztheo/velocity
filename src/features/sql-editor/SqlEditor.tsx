@@ -48,7 +48,7 @@ export function SqlEditor({ connectionId, initialSql = '' }: SqlEditorProps) {
   useEffect(() => {
     const loadSchema = async () => {
       try {
-        const tableList = await listTables(connectionId, 500, 0);
+        const tableList = await listTables(connectionId, 50, 0);
         setTables(tableList);
 
         // Load columns for each table (limit to first 10 for performance)

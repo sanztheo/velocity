@@ -69,11 +69,17 @@ export function Sidebar() {
 
     try {
       await connectToDatabase(conn.id);
-      const [tables, views, functions] = await Promise.all([
-        listTables(conn.id, 500, 0), // Limit to 500 tables for performance
-        listViews(conn.id),
-        listFunctions(conn.id),
+      
+      // Use Promise.allSettled so one failure doesn't block everything
+      const results = await Promise.allSettled([
+        listTables(conn.id, 50, 0), // Limit to 50 tables for faster initial load
+        listViews(conn.id).catch(() => []), // Gracefully fail
+        listFunctions(conn.id).catch(() => []), // Gracefully fail
       ]);
+      
+      const tables = results[0].status === 'fulfilled' ? results[0].value : [];
+      const views = results[1].status === 'fulfilled' ? results[1].value : [];
+      const functions = results[2].status === 'fulfilled' ? results[2].value : [];
       
       setConnectionStates(prev => ({
         ...prev,

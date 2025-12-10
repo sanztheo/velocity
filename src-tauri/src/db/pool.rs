@@ -45,10 +45,16 @@ impl ConnectionPoolManager {
 
     /// Connect and store the pool
     pub async fn connect(&self, connection: &Connection) -> Result<(), VelocityError> {
+        println!("[VELOCITY] Starting connection to: {}", connection.name);
         let pool = crate::db::factory::DatabaseFactory::create_pool(connection).await?;
+        println!(
+            "[VELOCITY] Pool created successfully for: {}",
+            connection.name
+        );
 
         let mut pools = self.pools.write().await;
         pools.insert(connection.id.clone(), Arc::new(pool));
+        println!("[VELOCITY] Connection stored: {}", connection.id);
         Ok(())
     }
 
@@ -112,10 +118,15 @@ impl ConnectionPoolManager {
         limit: Option<u32>,
         offset: Option<u32>,
     ) -> Result<Vec<String>, VelocityError> {
+        println!(
+            "[VELOCITY] list_tables called for: {} (limit: {:?})",
+            connection_id, limit
+        );
         let pool = self
             .get_pool(connection_id)
             .await
             .ok_or_else(|| VelocityError::Connection("Not connected".to_string()))?;
+        println!("[VELOCITY] Got pool, executing query...");
 
         match pool.as_ref() {
             DatabasePool::Postgres(pool) => {
@@ -134,8 +145,10 @@ impl ConnectionPoolManager {
                 Ok(rows.into_iter().map(|r| r.0).collect())
             }
             DatabasePool::MySQL(pool) => {
-                // Using information_schema for consistent pagination support
-                let mut query = "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() ORDER BY TABLE_NAME".to_string();
+                // SHOW TABLES is MUCH faster than information_schema on large DBs
+                // MySQL supports LIMIT/OFFSET on SHOW TABLES
+                println!("[VELOCITY] MySQL: Using SHOW TABLES query...");
+                let mut query = "SHOW TABLES".to_string();
                 if let Some(l) = limit {
                     query.push_str(&format!(" LIMIT {}", l));
                 }
@@ -147,6 +160,7 @@ impl ConnectionPoolManager {
                     .fetch_all(pool)
                     .await
                     .map_err(|e| VelocityError::Query(e.to_string()))?;
+                println!("[VELOCITY] MySQL: Got {} tables", rows.len());
                 Ok(rows.into_iter().map(|r| r.0).collect())
             }
             DatabasePool::SQLite(pool) => {
