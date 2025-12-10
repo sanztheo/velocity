@@ -1,4 +1,5 @@
 use tauri::command;
+use std::sync::Arc;
 use crate::db::pool::ConnectionPoolManager;
 use crate::error::VelocityError;
 use crate::import::{CsvPreview, ColumnMapping, ImportResult};
@@ -19,7 +20,7 @@ pub async fn import_csv(
     file_path: String,
     mappings: Vec<ColumnMapping>,
     delimiter: Option<char>,
-    pool_manager: tauri::State<'_, ConnectionPoolManager>,
+    pool_manager: tauri::State<'_, Arc<ConnectionPoolManager>>,
 ) -> Result<ImportResult, VelocityError> {
     let delim = delimiter.unwrap_or(',');
     let rows = crate::import::csv::parse_csv_with_mapping(&file_path, &mappings, delim)?;
@@ -63,7 +64,7 @@ pub async fn import_csv(
 pub async fn import_sql(
     id: String,
     file_path: String,
-    pool_manager: tauri::State<'_, ConnectionPoolManager>,
+    pool_manager: tauri::State<'_, Arc<ConnectionPoolManager>>,
 ) -> Result<ImportResult, VelocityError> {
     let sql_content = crate::import::sql::read_sql_file(&file_path)?;
     let statements = crate::import::sql::split_sql_statements(&sql_content);

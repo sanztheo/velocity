@@ -123,23 +123,32 @@ export function ExportDialog({
               onValueChange={(v) => setFormat(v as ExportFormat)}
               className="grid grid-cols-2 gap-3"
             >
-              {formatOptions.map((opt) => (
-                <div key={opt.value}>
-                  <RadioGroupItem
-                    value={opt.value}
-                    id={opt.value}
-                    className="peer sr-only"
-                  />
-                  <Label
-                    htmlFor={opt.value}
-                    className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer"
-                  >
-                    <opt.icon className="mb-2 h-6 w-6" />
-                    <span className="font-medium">{opt.label}</span>
-                    <span className="text-xs text-muted-foreground">{opt.description}</span>
-                  </Label>
-                </div>
-              ))}
+              {formatOptions.map((opt) => {
+                const isSelected = format === opt.value;
+                return (
+                  <div key={opt.value}>
+                    <RadioGroupItem
+                      value={opt.value}
+                      id={opt.value}
+                      className="peer sr-only"
+                    />
+                    <Label
+                      htmlFor={opt.value}
+                      className={`flex flex-col items-center justify-between rounded-md border-2 p-4 cursor-pointer transition-all
+                        ${isSelected 
+                          ? 'border-primary bg-primary/10 text-primary ring-2 ring-primary/20' 
+                          : 'border-muted bg-popover hover:bg-accent hover:text-accent-foreground hover:border-accent-foreground/20'
+                        }`}
+                    >
+                      <opt.icon className={`mb-2 h-6 w-6 ${isSelected ? 'text-primary' : ''}`} />
+                      <span className="font-medium">{opt.label}</span>
+                      <span className={`text-xs ${isSelected ? 'text-primary/70' : 'text-muted-foreground'}`}>
+                        {opt.description}
+                      </span>
+                    </Label>
+                  </div>
+                );
+              })}
             </RadioGroup>
           </div>
 

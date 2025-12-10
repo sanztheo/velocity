@@ -1,5 +1,6 @@
 use tauri::command;
 use std::path::PathBuf;
+use std::sync::Arc;
 use crate::db::pool::ConnectionPoolManager;
 use crate::error::VelocityError;
 use crate::export::{ExportFormat, ExportResult};
@@ -12,7 +13,7 @@ pub async fn export_table_data(
     format: ExportFormat,
     file_path: String,
     options: Option<serde_json::Value>,
-    pool_manager: tauri::State<'_, ConnectionPoolManager>,
+    pool_manager: tauri::State<'_, Arc<ConnectionPoolManager>>,
 ) -> Result<ExportResult, VelocityError> {
     // Fetch table data using the manager's get_table_data method
     let data = pool_manager.get_table_data(&id, &table_name, 10000, 0).await?;
