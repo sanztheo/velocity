@@ -125,8 +125,7 @@ export function Sidebar() {
     setIsAddModalOpen(true);
   };
 
-  const handleDelete = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleDelete = async (id: string) => {
     console.log("[DELETE] Deleting connection:", id);
     if (confirm("Are you sure you want to delete this connection?")) {
       try {
@@ -255,12 +254,16 @@ export function Sidebar() {
                          </DropdownMenuItem>
                       )}
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEdit(conn); }}>
+                      <DropdownMenuItem onSelect={() => handleEdit(conn)}>
                         <Edit className="h-3 w-3 mr-2" /> Edit
                       </DropdownMenuItem>
                       <DropdownMenuItem 
                         className="text-destructive focus:text-destructive"
-                        onClick={(e) => handleDelete(conn.id, e)}
+                        onSelect={() => {
+                          console.log("[DROPDOWN] Delete onSelect triggered");
+                          // Use setTimeout to let dropdown close first, then show confirm
+                          setTimeout(() => handleDelete(conn.id), 0);
+                        }}
                       >
                         <Trash className="h-3 w-3 mr-2" /> Delete
                       </DropdownMenuItem>
