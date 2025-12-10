@@ -1,5 +1,33 @@
-# Logs
-logs
+# ===================================
+# 📦 Dependencies
+# ===================================
+node_modules/
+.pnpm-store/
+
+# ===================================
+# 🏗️ Build Outputs
+# ===================================
+dist/
+dist-ssr/
+*.local
+
+# Tauri build artifacts
+src-tauri/target/
+src-tauri/gen/schemas/
+
+# ===================================
+# 🔐 Environment & Secrets
+# ===================================
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+
+# ===================================
+# 📝 Logs
+# ===================================
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -7,18 +35,98 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
-
-# Editor directories and files
+# ===================================
+# 💻 IDE & Editor
+# ===================================
+# VSCode
 .vscode/*
 !.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+# JetBrains (WebStorm, RustRover, IntelliJ)
+.idea/
+*.iml
+
+# Vim
 *.sw?
+*.swp
+*.swo
+*~
+
+# Emacs
+\#*\#
+.#*
+
+# ===================================
+# 🖥️ OS Generated Files
+# ===================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# ===================================
+# 🦀 Rust / Cargo
+# ===================================
+# Handled by src-tauri/.gitignore but also here for safety
+**/target/
+**/*.rs.bk
+Cargo.lock
+!src-tauri/Cargo.lock
+
+# ===================================
+# 🧪 Testing & Coverage
+# ===================================
+coverage/
+.nyc_output/
+*.lcov
+test-results/
+playwright-report/
+playwright/.cache/
+
+# ===================================
+# 🔧 Misc
+# ===================================
+# TypeScript cache
+*.tsbuildinfo
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Debug files
+*.pem
+*.p12
+
+# Package manager locks (keep one, ignore others if switching)
+# Uncomment if you want to ignore lock files:
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# ===================================
+# 📸 Screenshots & Dev Assets (optional)
+# ===================================
+# Uncomment to ignore development screenshots
+# *.png
+# *.jpg
+# *.jpeg
+# !public/**/*.png
+# !public/**/*.jpg
+# !src/assets/**/*
+
+# ===================================
+# 🤖 AI & Agent Files
+# ===================================
+.agent/
+.gemini/
+.cursor/
+.aider*

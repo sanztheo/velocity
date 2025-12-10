@@ -5,6 +5,7 @@ pub mod models;
 pub mod ssh;
 pub mod store;
 
+use commands::ai::*;
 use commands::connections::*;
 use commands::database::*;
 use commands::keychain::*;
@@ -17,6 +18,9 @@ use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Load .env file for environment variables like OPENAI_API_KEY
+    let _ = dotenvy::dotenv();
+
     let pool_manager = Arc::new(ConnectionPoolManager::new());
     let ssh_manager = Arc::new(SshTunnelManager::new());
 
@@ -51,6 +55,8 @@ pub fn run() {
             execute_changes,
             execute_query,
             explain_query,
+            // AI commands
+            ai_sql_complete,
             // Keychain operations
             save_password,
             get_password,

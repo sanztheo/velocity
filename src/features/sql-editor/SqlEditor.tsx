@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useSqlEditor } from './useSqlEditor';
+import { useAiCompletion } from './useAiCompletion';
 import { CodeMirrorEditor } from './CodeMirrorEditor';
 import { QueryResult } from './types';
 import { listTables, getTableSchema } from '@/lib/tauri';
@@ -18,7 +19,8 @@ import {
   Loader2,
   AlertCircle,
   Table,
-  FileQuestion
+  FileQuestion,
+  Sparkles
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -31,12 +33,15 @@ export function SqlEditor({ connectionId, initialSql = '' }: SqlEditorProps) {
   const [tables, setTables] = useState<string[]>([]);
   const [columns, setColumns] = useState<Record<string, string[]>>({});
   const [showHistory, setShowHistory] = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
+  const [isLoadingAi, setIsLoadingAi] = useState(false);
   
   const { connections } = useAppStore();
   const connection = connections.find(c => c.id === connectionId);
   const dbType = (connection?.config?.type?.toLowerCase() || 'postgresql') as 'postgresql' | 'mysql' | 'sqlite';
 
   const editor = useSqlEditor({ connectionId, initialSql });
+  const aiCompletion = useAiCompletion({ tables, columns, dbType });
 
   // Load tables and columns for autocomplete
   useEffect(() => {
@@ -64,6 +69,26 @@ export function SqlEditor({ connectionId, initialSql = '' }: SqlEditorProps) {
 
     loadSchema();
   }, [connectionId]);
+
+  // AI suggest handler
+  const handleAiSuggest = useCallback(async () => {
+    if (!editor.sql.trim() || isLoadingAi) return;
+    setIsLoadingAi(true);
+    try {
+      const suggestions = await aiCompletion.getAiSuggestions(editor.sql);
+      setAiSuggestions(suggestions);
+    } catch {
+      setAiSuggestions([]);
+    } finally {
+      setIsLoadingAi(false);
+    }
+  }, [editor.sql, isLoadingAi, aiCompletion]);
+
+  // Apply AI suggestion
+  const applySuggestion = useCallback((suggestion: string) => {
+    editor.setSql(suggestion);
+    setAiSuggestions([]);
+  }, [editor]);
 
   // Render result table
   const renderResultTable = useCallback((result: QueryResult, _index: number) => {
@@ -160,6 +185,23 @@ export function SqlEditor({ connectionId, initialSql = '' }: SqlEditorProps) {
           History
         </Button>
 
+        <div className="h-4 w-px bg-border mx-1" />
+
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={handleAiSuggest}
+          disabled={isLoadingAi || !editor.sql.trim()}
+          title="Get AI suggestions (requires OPENAI_API_KEY)"
+        >
+          {isLoadingAi ? (
+            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+          ) : (
+            <Sparkles className="h-4 w-4 mr-1 text-purple-400" />
+          )}
+          AI Suggest
+        </Button>
+
         <div className="flex-1" />
 
         {editor.results.length > 0 && (
@@ -170,6 +212,32 @@ export function SqlEditor({ connectionId, initialSql = '' }: SqlEditorProps) {
           </Badge>
         )}
       </div>
+
+      {/* AI Suggestions Panel */}
+      {aiSuggestions.length > 0 && (
+        <div className="flex items-center gap-2 px-2 py-1.5 border-b border-border bg-purple-500/10">
+          <Sparkles className="h-3 w-3 text-purple-400 flex-shrink-0" />
+          <span className="text-xs text-muted-foreground">AI Suggestions:</span>
+          <div className="flex flex-wrap gap-1.5">
+            {aiSuggestions.map((suggestion, i) => (
+              <button
+                key={i}
+                onClick={() => applySuggestion(suggestion)}
+                className="px-2 py-0.5 text-xs font-mono bg-purple-500/20 hover:bg-purple-500/40 rounded transition-colors max-w-[300px] truncate"
+                title={suggestion}
+              >
+                {suggestion.length > 50 ? suggestion.slice(0, 50) + '...' : suggestion}
+              </button>
+            ))}
+          </div>
+          <button 
+            onClick={() => setAiSuggestions([])} 
+            className="ml-auto text-xs text-muted-foreground hover:text-foreground"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       <div className="flex flex-1 min-h-0">
         {/* History Panel */}

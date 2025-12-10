@@ -141,3 +141,22 @@ export async function explainQuery(
 ): Promise<ExplainResult> {
   return await invoke("explain_query", { connectionId, sql });
 }
+
+// AI-powered SQL completion
+export interface AiCompletionRequest {
+  partialSql: string;
+  tableContext: string[];
+  columnContext: string[];
+  dbType: string;
+}
+
+export interface AiCompletionResponse {
+  suggestions: string[];
+}
+
+export async function aiSqlComplete(
+  request: AiCompletionRequest
+): Promise<AiCompletionResponse> {
+  return await invoke("ai_sql_complete", { request });
+}
+

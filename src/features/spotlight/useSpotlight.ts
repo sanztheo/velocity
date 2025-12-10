@@ -72,6 +72,7 @@ export function useSpotlight() {
   // Build searchable items
   const items = useMemo<SpotlightItem[]>(() => {
     const result: SpotlightItem[] = [];
+    const activeConn = connections.find(c => c.id === activeConnectionId);
 
     // Add connections
     connections.forEach(conn => {
@@ -86,7 +87,6 @@ export function useSpotlight() {
     // Add database objects for active connection
     if (activeConnectionId && connectionData[activeConnectionId]) {
       const data = connectionData[activeConnectionId];
-      const activeConn = connections.find(c => c.id === activeConnectionId);
       
       data.tables.forEach(table => {
         result.push({
@@ -119,11 +119,17 @@ export function useSpotlight() {
       });
     }
 
-    // Quick actions will be added when SQL Editor is implemented
-    // result.push(
-    //   { id: 'action-new-connection', type: 'action', name: 'New Connection', shortcut: '⌘N' },
-    //   { id: 'action-new-query', type: 'action', name: 'New SQL Query', shortcut: '⌘T' },
-    // );
+    // Quick actions - only show if connected
+    if (activeConnectionId) {
+      result.push({
+        id: 'action-new-query',
+        type: 'action',
+        name: 'New SQL Query',
+        connectionId: activeConnectionId,
+        connectionName: activeConn?.name,
+        shortcut: '⌘T',
+      });
+    }
 
     return result;
   }, [connections, activeConnectionId, connectionData]);
@@ -162,7 +168,14 @@ export function useSpotlight() {
         }
         break;
       case 'action':
-        // Handle actions (to be implemented)
+        if (item.id === 'action-new-query' && item.connectionId) {
+          addTab({
+            id: `query-${item.connectionId}-${Date.now()}`,
+            title: 'New Query',
+            type: 'query',
+            connectionId: item.connectionId,
+          });
+        }
         break;
     }
   }, [addTab, setActiveConnection]);
