@@ -73,6 +73,7 @@ pub enum ConnectionConfig {
     Redis {
         host: String,
         port: u16,
+        username: Option<String>, // For Redis ACL (e.g., "default")
         password: Option<String>,
         database: u8, // Redis DB index (0-15)
         use_tls: bool,

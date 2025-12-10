@@ -152,20 +152,19 @@ impl DatabaseFactory {
             ConnectionConfig::Redis {
                 host,
                 port,
+                username,
                 password,
                 database,
                 use_tls,
             } => {
-                let url = match (password, use_tls) {
-                    (Some(pwd), true) => {
-                        format!("rediss://:{}@{}:{}/{}", pwd, host, port, database)
-                    }
-                    (Some(pwd), false) => {
-                        format!("redis://:{}@{}:{}/{}", pwd, host, port, database)
-                    }
-                    (None, true) => format!("rediss://{}:{}/{}", host, port, database),
-                    (None, false) => format!("redis://{}:{}/{}", host, port, database),
+                let scheme = if *use_tls { "rediss" } else { "redis" };
+                let auth = match (username, password) {
+                    (Some(user), Some(pwd)) => format!("{}:{}@", user, pwd),
+                    (None, Some(pwd)) => format!(":{}@", pwd),
+                    (Some(user), None) => format!("{}@", user),
+                    (None, None) => String::new(),
                 };
+                let url = format!("{}://{}{}:{}/{}", scheme, auth, host, port, database);
 
                 let client = redis::Client::open(url)
                     .map_err(|e| VelocityError::Connection(e.to_string()))?;
@@ -349,20 +348,19 @@ impl DatabaseFactory {
             ConnectionConfig::Redis {
                 host,
                 port,
+                username,
                 password,
                 database,
                 use_tls,
             } => {
-                let url = match (password, use_tls) {
-                    (Some(pwd), true) => {
-                        format!("rediss://:{}@{}:{}/{}", pwd, host, port, database)
-                    }
-                    (Some(pwd), false) => {
-                        format!("redis://:{}@{}:{}/{}", pwd, host, port, database)
-                    }
-                    (None, true) => format!("rediss://{}:{}/{}", host, port, database),
-                    (None, false) => format!("redis://{}:{}/{}", host, port, database),
+                let scheme = if *use_tls { "rediss" } else { "redis" };
+                let auth = match (username, password) {
+                    (Some(user), Some(pwd)) => format!("{}:{}@", user, pwd),
+                    (None, Some(pwd)) => format!(":{}@", pwd),
+                    (Some(user), None) => format!("{}@", user),
+                    (None, None) => String::new(),
                 };
+                let url = format!("{}://{}{}:{}/{}", scheme, auth, host, port, database);
 
                 let client = redis::Client::open(url)
                     .map_err(|e| VelocityError::Connection(e.to_string()))?;

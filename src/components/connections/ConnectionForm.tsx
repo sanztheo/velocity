@@ -61,13 +61,14 @@ function parseConnectionUrl(url: string): Partial<FormValues> | null {
   try {
     // Handle different URL formats
     // postgresql://user:password@host:port/database
-    // mysql://user:password@host:port/database
-    // Supports:
-    // protocol://user:password@host:port/database
-    // protocol://user@host:port/database
-    const match = url.match(/^(\w+):\/\/(?:([^:@]+)(?::([^@]*))?@)?([^:\/]+)(?::(\d+))?\/(.+)$/);
+    // redis://user:password@host:port/0
+    // rediss://... (TLS)
+    const match = url.match(/^(rediss?|postgresql|postgres|mysql|mariadb|cockroachdb|redshift):\/\/(?:([^:@]+)(?::([^@]*))?@)?([^:\/]+)(?::(\d+))?(?:\/(.*))?$/);
     if (match) {
       const [, protocol, user, pass, host, port, database] = match;
+      const isRedis = protocol.toLowerCase().startsWith('redis');
+      const isTls = protocol.toLowerCase() === 'rediss';
+      
       const dbTypeMap: Record<string, DatabaseType> = {
         postgresql: "PostgreSQL",
         postgres: "PostgreSQL",
@@ -79,13 +80,25 @@ function parseConnectionUrl(url: string): Partial<FormValues> | null {
         redis: "Redis",
         rediss: "Redis",
       };
+      
+      const defaultPorts: Record<string, string> = {
+        postgresql: "5432",
+        postgres: "5432",
+        mysql: "3306",
+        mariadb: "3306",
+        redis: "6379",
+        rediss: "6379",
+      };
+      
       return {
         dbType: dbTypeMap[protocol.toLowerCase()] || "PostgreSQL",
         username: user || "",
         password: pass || "",
         host: host || "localhost",
-        port: port || "5432",
-        database: database || "",
+        port: port || defaultPorts[protocol.toLowerCase()] || "5432",
+        database: isRedis ? (database || "0") : (database || ""),
+        useTls: isTls,
+        ssl: !isRedis && (protocol.endsWith('s') || false),
       };
     }
   } catch {
