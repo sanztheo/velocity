@@ -56,6 +56,20 @@ export interface ColumnInfo {
   isPrimaryKey: boolean;
 }
 
+export interface ForeignKeyInfo {
+  constraintName: string;
+  columnName: string;
+  referencedTable: string;
+  referencedColumn: string;
+}
+
+export async function getTableForeignKeys(
+  connectionId: string,
+  tableName: string
+): Promise<ForeignKeyInfo[]> {
+  return await invoke("get_table_foreign_keys", { connectionId, tableName });
+}
+
 export interface TableData {
   columns: string[];
   rows: unknown[][];

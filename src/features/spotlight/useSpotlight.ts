@@ -119,11 +119,11 @@ export function useSpotlight() {
       });
     }
 
-    // Add quick actions
-    result.push(
-      { id: 'action-new-connection', type: 'action', name: 'New Connection', shortcut: '⌘N' },
-      { id: 'action-new-query', type: 'action', name: 'New SQL Query', shortcut: '⌘T' },
-    );
+    // Quick actions will be added when SQL Editor is implemented
+    // result.push(
+    //   { id: 'action-new-connection', type: 'action', name: 'New Connection', shortcut: '⌘N' },
+    //   { id: 'action-new-query', type: 'action', name: 'New SQL Query', shortcut: '⌘T' },
+    // );
 
     return result;
   }, [connections, activeConnectionId, connectionData]);

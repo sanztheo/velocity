@@ -541,6 +541,112 @@ impl ConnectionPoolManager {
         }
     }
 
+    /// Get foreign key relationships for a table
+    pub async fn get_table_foreign_keys(
+        &self,
+        connection_id: &str,
+        table_name: &str,
+    ) -> Result<Vec<crate::commands::database::ForeignKeyInfo>, VelocityError> {
+        use crate::commands::database::ForeignKeyInfo;
+
+        let pool = self
+            .get_pool(connection_id)
+            .await
+            .ok_or_else(|| VelocityError::Connection("Not connected".to_string()))?;
+
+        match pool.as_ref() {
+            DatabasePool::Postgres(pool) => {
+                let rows: Vec<(String, String, String, String)> = sqlx::query_as(
+                    r#"SELECT 
+                        tc.constraint_name,
+                        kcu.column_name,
+                        ccu.table_name AS referenced_table,
+                        ccu.column_name AS referenced_column
+                    FROM information_schema.table_constraints AS tc
+                    JOIN information_schema.key_column_usage AS kcu
+                        ON tc.constraint_name = kcu.constraint_name
+                        AND tc.table_schema = kcu.table_schema
+                    JOIN information_schema.constraint_column_usage AS ccu
+                        ON ccu.constraint_name = tc.constraint_name
+                        AND ccu.table_schema = tc.table_schema
+                    WHERE tc.constraint_type = 'FOREIGN KEY'
+                        AND tc.table_name = $1
+                        AND tc.table_schema = 'public'
+                    ORDER BY tc.constraint_name"#,
+                )
+                .bind(table_name)
+                .fetch_all(pool)
+                .await
+                .map_err(|e| VelocityError::Query(e.to_string()))?;
+
+                Ok(rows
+                    .into_iter()
+                    .map(
+                        |(constraint_name, column_name, referenced_table, referenced_column)| {
+                            ForeignKeyInfo {
+                                constraint_name,
+                                column_name,
+                                referenced_table,
+                                referenced_column,
+                            }
+                        },
+                    )
+                    .collect())
+            }
+            DatabasePool::MySQL(pool) => {
+                let rows: Vec<(String, String, String, String)> = sqlx::query_as(
+                    r#"SELECT 
+                        CONSTRAINT_NAME,
+                        COLUMN_NAME,
+                        REFERENCED_TABLE_NAME,
+                        REFERENCED_COLUMN_NAME
+                    FROM information_schema.KEY_COLUMN_USAGE
+                    WHERE TABLE_NAME = ?
+                        AND REFERENCED_TABLE_NAME IS NOT NULL
+                        AND TABLE_SCHEMA = DATABASE()
+                    ORDER BY CONSTRAINT_NAME"#,
+                )
+                .bind(table_name)
+                .fetch_all(pool)
+                .await
+                .map_err(|e| VelocityError::Query(e.to_string()))?;
+
+                Ok(rows
+                    .into_iter()
+                    .map(
+                        |(constraint_name, column_name, referenced_table, referenced_column)| {
+                            ForeignKeyInfo {
+                                constraint_name,
+                                column_name,
+                                referenced_table,
+                                referenced_column,
+                            }
+                        },
+                    )
+                    .collect())
+            }
+            DatabasePool::SQLite(pool) => {
+                // SQLite uses PRAGMA for FK info
+                let rows: Vec<(i32, i32, String, String, String, String, String, String)> =
+                    sqlx::query_as(&format!("PRAGMA foreign_key_list('{}')", table_name))
+                        .fetch_all(pool)
+                        .await
+                        .map_err(|e| VelocityError::Query(e.to_string()))?;
+
+                Ok(rows
+                    .into_iter()
+                    .map(|(id, _, table, from, to, _, _, _)| ForeignKeyInfo {
+                        constraint_name: format!("fk_{}", id),
+                        column_name: from,
+                        referenced_table: table,
+                        referenced_column: to,
+                    })
+                    .collect())
+            }
+            _ => Ok(vec![]),
+        }
+    }
+
     pub async fn get_table_schema(
         &self,
         connection_id: &str,

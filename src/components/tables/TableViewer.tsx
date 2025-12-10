@@ -4,6 +4,7 @@ import { getTableSchema, getTableData, executeChanges, ColumnInfo, TableData } f
 import { useTableEditor } from '@/hooks/useTableEditor';
 import { EditableCell } from './EditableCell';
 import { SqlPreviewModal } from './SqlPreviewModal';
+import { ForeignKeysPanel } from './ForeignKeysPanel';
 import { Loader2, Plus, Trash2, Save, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -290,6 +291,9 @@ export function TableViewer({ connectionId, tableName }: TableViewerProps) {
           {schema.length} columns
         </div>
       </div>
+
+      {/* Foreign Keys Panel */}
+      <ForeignKeysPanel connectionId={connectionId} tableName={tableName} />
 
       {/* Table container with virtual scrolling */}
       <div

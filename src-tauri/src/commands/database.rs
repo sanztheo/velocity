@@ -82,6 +82,28 @@ pub async fn list_functions(
     pool_manager.list_functions(&id).await
 }
 
+/// Foreign key info structure
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ForeignKeyInfo {
+    pub constraint_name: String,
+    pub column_name: String,
+    pub referenced_table: String,
+    pub referenced_column: String,
+}
+
+/// Get table foreign keys
+#[tauri::command]
+pub async fn get_table_foreign_keys(
+    connection_id: String,
+    table_name: String,
+    pool_manager: State<'_, Arc<ConnectionPoolManager>>,
+) -> Result<Vec<ForeignKeyInfo>, VelocityError> {
+    pool_manager
+        .get_table_foreign_keys(&connection_id, &table_name)
+        .await
+}
+
 /// Get table schema (columns)
 #[tauri::command]
 pub async fn get_table_schema(
