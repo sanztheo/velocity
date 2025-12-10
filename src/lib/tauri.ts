@@ -88,6 +88,33 @@ export async function getTableData(
   return await invoke("get_table_data", { connectionId, tableName, limit, offset });
 }
 
+// Filtered table data with sorting and pagination
+export interface QueryOptions {
+  filters: Array<{
+    column: string;
+    operator: string;
+    value?: unknown;
+  }>;
+  filterLogic: 'and' | 'or';
+  sort: { column: string; direction: 'asc' | 'desc' } | null;
+  limit: number;
+  offset: number;
+}
+
+export interface TableDataResponse {
+  columns: string[];
+  rows: unknown[][];
+  totalCount: number;
+}
+
+export async function getTableDataFiltered(
+  connectionId: string,
+  tableName: string,
+  options: QueryOptions
+): Promise<TableDataResponse> {
+  return await invoke("get_table_data_filtered", { connectionId, tableName, options });
+}
+
 // Data editing
 export interface PendingChange {
   rowId: string;
