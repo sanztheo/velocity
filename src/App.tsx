@@ -7,7 +7,7 @@ import { StructurePanel } from "@/features/structure-editor";
 import { SpotlightSearch } from "@/features/spotlight";
 import { SqlEditor } from "@/features/sql-editor";
 import { ERDiagram } from "@/features/erd";
-
+import { PerformanceMonitor } from "@/components/PerformanceMonitor";
 function App() {
   const { theme, activeTabId, tabs } = useAppStore();
 
@@ -30,7 +30,7 @@ function App() {
     <>
       <AppLayout>
         {activeTab ? (
-          <div className="h-full flex flex-col">
+          <div className="flex-1 flex flex-col min-w-0 bg-background/50 backdrop-blur-sm relative">
             {activeTab.type === 'table' && activeTab.connectionId && (
               <EnhancedTableViewer 
                 connectionId={activeTab.connectionId} 
@@ -52,19 +52,20 @@ function App() {
             {activeTab.type === 'erd' && activeTab.connectionId && (
               <ERDiagram connectionId={activeTab.connectionId} />
             )}
+            {/* Global Performance Monitor */}
+            <PerformanceMonitor />
           </div>
         ) : (
-          <div className="flex h-full items-center justify-center">
-            <div className="text-center">
-              <h2 className="text-xl font-semibold mb-2 text-foreground">Welcome to Velocity</h2>
-              <p className="text-muted-foreground">
-                Press <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">⌘K</kbd> to search, or double-click a connection
-              </p>
+          <div className="flex-1 flex items-center justify-center text-muted-foreground/50"> {/* Replaced empty state */}
+            <div className="flex flex-col items-center gap-2">
+              <span className="text-4xl font-light">Velocity</span>
+              <span className="text-sm">Select a table or open a new query to get started</span>
+              <SpotlightSearch /> {/* Moved SpotlightSearch here */}
             </div>
           </div>
         )}
       </AppLayout>
-      <SpotlightSearch />
+      {/* SpotlightSearch is now inside the empty state */}
       <Toaster position="top-right" />
     </>
   );

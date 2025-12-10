@@ -79,13 +79,26 @@ export async function getTableSchema(connectionId: string, tableName: string): P
   return await invoke("get_table_schema", { connectionId, tableName });
 }
 
+// Performance Store
+import { usePerformanceStore } from "@/stores/performanceStore";
+
 export async function getTableData(
   connectionId: string, 
   tableName: string, 
   limit: number = 100, 
   offset: number = 0
 ): Promise<TableData> {
-  return await invoke("get_table_data", { connectionId, tableName, limit, offset });
+  const start = performance.now();
+  try {
+    const result = await invoke<TableData>("get_table_data", { connectionId, tableName, limit, offset });
+    const duration = performance.now() - start;
+    usePerformanceStore.getState().recordQuery(duration, result.rows.length);
+    return result;
+  } catch (error) {
+    const duration = performance.now() - start;
+    usePerformanceStore.getState().recordQuery(duration, 0, String(error));
+    throw error;
+  }
 }
 
 // Filtered table data with sorting and pagination
@@ -112,7 +125,17 @@ export async function getTableDataFiltered(
   tableName: string,
   options: QueryOptions
 ): Promise<TableDataResponse> {
-  return await invoke("get_table_data_filtered", { connectionId, tableName, options });
+  const start = performance.now();
+  try {
+    const result = await invoke<TableDataResponse>("get_table_data_filtered", { connectionId, tableName, options });
+    const duration = performance.now() - start;
+    usePerformanceStore.getState().recordQuery(duration, result.rows.length);
+    return result;
+  } catch (error) {
+    const duration = performance.now() - start;
+    usePerformanceStore.getState().recordQuery(duration, 0, String(error));
+    throw error;
+  }
 }
 
 // Data editing
@@ -155,7 +178,17 @@ export async function executeQuery(
   connectionId: string,
   sql: string
 ): Promise<QueryResultData> {
-  return await invoke("execute_query", { connectionId, sql });
+  const start = performance.now();
+  try {
+    const result = await invoke<QueryResultData>("execute_query", { connectionId, sql });
+    const duration = performance.now() - start;
+    usePerformanceStore.getState().recordQuery(duration, result.rowCount);
+    return result;
+  } catch (error) {
+    const duration = performance.now() - start;
+    usePerformanceStore.getState().recordQuery(duration, 0, String(error));
+    throw error;
+  }
 }
 
 export interface ExplainResult {
