@@ -62,7 +62,10 @@ function parseConnectionUrl(url: string): Partial<FormValues> | null {
     // Handle different URL formats
     // postgresql://user:password@host:port/database
     // mysql://user:password@host:port/database
-    const match = url.match(/^(\w+):\/\/(?:([^:]+):([^@]+)@)?([^:\/]+)(?::(\d+))?\/(.+)$/);
+    // Supports:
+    // protocol://user:password@host:port/database
+    // protocol://user@host:port/database
+    const match = url.match(/^(\w+):\/\/(?:([^:@]+)(?::([^@]*))?@)?([^:\/]+)(?::(\d+))?\/(.+)$/);
     if (match) {
       const [, protocol, user, pass, host, port, database] = match;
       const dbTypeMap: Record<string, DatabaseType> = {

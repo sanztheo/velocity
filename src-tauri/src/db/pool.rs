@@ -1,6 +1,6 @@
 use crate::error::VelocityError;
 use crate::models::connection::{Connection, ConnectionConfig};
-use sqlx::{Column, MySql, Pool, Postgres, Row, Sqlite};
+use sqlx::{Column, ConnectOptions, MySql, Pool, Postgres, Row, Sqlite};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -95,6 +95,7 @@ impl ConnectionPoolManager {
                 database,
                 username,
                 password,
+                ssl,
                 ..
             }
             | ConnectionConfig::MariaDB {
@@ -103,21 +104,49 @@ impl ConnectionPoolManager {
                 database,
                 username,
                 password,
+                ssl,
                 ..
             } => {
-                let url = if let Some(pwd) = password.as_deref().filter(|s| !s.is_empty()) {
-                    format!(
-                        "mysql://{}:{}@{}:{}/{}",
-                        username, pwd, host, port, database
-                    )
-                } else {
-                    format!("mysql://{}@{}:{}/{}", username, host, port, database)
-                };
+                let mut opts = sqlx::mysql::MySqlConnectOptions::new()
+                    .host(host)
+                    .port(*port)
+                    .username(username)
+                    .database(database)
+                    .database(database);
+
+                if let Some(pwd) = password.as_deref().filter(|s| !s.is_empty()) {
+                    opts = opts.password(pwd);
+                }
+
+                if ssl.enabled {
+                    let mode = match ssl.mode {
+                        crate::models::connection::SslMode::Disable => {
+                            sqlx::mysql::MySqlSslMode::Disabled
+                        }
+                        crate::models::connection::SslMode::Prefer => {
+                            sqlx::mysql::MySqlSslMode::Preferred
+                        }
+                        crate::models::connection::SslMode::Require => {
+                            sqlx::mysql::MySqlSslMode::Required
+                        }
+                        crate::models::connection::SslMode::VerifyCA => {
+                            sqlx::mysql::MySqlSslMode::VerifyCa
+                        }
+                        crate::models::connection::SslMode::VerifyFull => {
+                            sqlx::mysql::MySqlSslMode::VerifyIdentity
+                        }
+                    };
+                    opts = opts.ssl_mode(mode);
+
+                    if let Some(ca) = &ssl.ca_cert_path {
+                        opts = opts.ssl_ca(&ca);
+                    }
+                }
 
                 let pool = sqlx::mysql::MySqlPoolOptions::new()
                     .max_connections(1)
-                    .acquire_timeout(std::time::Duration::from_secs(5))
-                    .connect(&url)
+                    .acquire_timeout(std::time::Duration::from_secs(10))
+                    .connect_with(opts)
                     .await
                     .map_err(|e| VelocityError::Connection(e.to_string()))?;
 
@@ -284,6 +313,7 @@ impl ConnectionPoolManager {
                 database,
                 username,
                 password,
+                ssl,
                 ..
             }
             | ConnectionConfig::MariaDB {
@@ -292,21 +322,50 @@ impl ConnectionPoolManager {
                 database,
                 username,
                 password,
+                ssl,
                 ..
             } => {
-                let url = if let Some(pwd) = password.as_deref().filter(|s| !s.is_empty()) {
-                    format!(
-                        "mysql://{}:{}@{}:{}/{}",
-                        username, pwd, host, port, database
-                    )
-                } else {
-                    format!("mysql://{}@{}:{}/{}", username, host, port, database)
-                };
+                let mut opts = sqlx::mysql::MySqlConnectOptions::new()
+                    .host(host)
+                    .port(*port)
+                    .username(username)
+                    .database(database)
+                    .database(database);
+
+                if let Some(pwd) = password.as_deref().filter(|s| !s.is_empty()) {
+                    opts = opts.password(pwd);
+                }
+
+                if ssl.enabled {
+                    let mode = match ssl.mode {
+                        crate::models::connection::SslMode::Disable => {
+                            sqlx::mysql::MySqlSslMode::Disabled
+                        }
+                        crate::models::connection::SslMode::Prefer => {
+                            sqlx::mysql::MySqlSslMode::Preferred
+                        }
+                        crate::models::connection::SslMode::Require => {
+                            sqlx::mysql::MySqlSslMode::Required
+                        }
+                        crate::models::connection::SslMode::VerifyCA => {
+                            sqlx::mysql::MySqlSslMode::VerifyCa
+                        }
+                        crate::models::connection::SslMode::VerifyFull => {
+                            sqlx::mysql::MySqlSslMode::VerifyIdentity
+                        }
+                    };
+                    opts = opts.ssl_mode(mode);
+
+                    if let Some(ca) = &ssl.ca_cert_path {
+                        opts = opts.ssl_ca(&ca);
+                    }
+                }
 
                 let pool = sqlx::mysql::MySqlPoolOptions::new()
                     .max_connections(5)
-                    .acquire_timeout(std::time::Duration::from_secs(10))
-                    .connect(&url)
+                    .acquire_timeout(std::time::Duration::from_secs(30))
+                    .idle_timeout(std::time::Duration::from_secs(600))
+                    .connect_with(opts)
                     .await
                     .map_err(|e| VelocityError::Connection(e.to_string()))?;
 
