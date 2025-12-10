@@ -51,6 +51,7 @@ pub fn run() {
             list_functions,
             get_table_schema,
             get_table_data,
+            get_table_data_filtered,
             get_table_foreign_keys,
             execute_changes,
             execute_query,

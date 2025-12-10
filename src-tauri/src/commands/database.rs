@@ -1,4 +1,5 @@
-use crate::db::{ColumnInfo, ConnectionPoolManager, TableData};
+use crate::db::table_data::fetch_table_data;
+use crate::db::{ColumnInfo, ConnectionPoolManager, QueryOptions, TableData, TableDataResponse};
 use crate::error::VelocityError;
 use crate::models::connection::Connection;
 use crate::store::connections::ConnectionsStore;
@@ -128,6 +129,26 @@ pub async fn get_table_data(
     pool_manager
         .get_table_data(&connection_id, &table_name, limit, offset)
         .await
+}
+
+/// Get table data with filtering, sorting, and pagination
+#[tauri::command]
+pub async fn get_table_data_filtered(
+    connection_id: String,
+    table_name: String,
+    options: QueryOptions,
+    pool_manager: State<'_, Arc<ConnectionPoolManager>>,
+) -> Result<TableDataResponse, VelocityError> {
+    let pool = pool_manager
+        .get_pool(&connection_id)
+        .await
+        .ok_or_else(|| VelocityError::Connection("Not connected".to_string()))?;
+
+    let columns = pool_manager
+        .get_table_schema(&connection_id, &table_name)
+        .await?;
+
+    fetch_table_data(pool.as_ref(), &table_name, &columns, &options).await
 }
 
 /// A pending change to be executed
