@@ -24,6 +24,7 @@ import { Connection } from "@/types";
 import { connectToDatabase, disconnectFromDatabase, listTables, listViews, listFunctions, deleteConnection } from "@/lib/tauri";
 import { toast } from "sonner";
 import { CreateTableDialog } from "@/features/structure-editor";
+import { DeleteConnectionDialog } from "@/components/modals/DeleteConnectionDialog";
 
 interface ConnectionState {
   isConnected: boolean;
@@ -42,6 +43,10 @@ export function Sidebar() {
   const [editingConnection, setEditingConnection] = useState<Connection | null>(null);
   const [connectionStates, setConnectionStates] = useState<Record<string, ConnectionState>>({});
   const [createTableConnectionId, setCreateTableConnectionId] = useState<string | null>(null);
+  
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [connectionToDelete, setConnectionToDelete] = useState<Connection | null>(null);
 
   const { delete: deleteMutation } = useConnections();
 
@@ -125,23 +130,27 @@ export function Sidebar() {
     setIsAddModalOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    console.log("[DELETE] handleDelete called for:", id);
-    const confirmed = window.confirm("Are you sure you want to delete this connection?");
-    console.log("[DELETE] Confirmed:", confirmed);
-    if (confirmed) {
-      deleteConnection(id)
-        .then(() => {
-          console.log("[DELETE] Backend call successful");
-          // Refresh the connections list
-          window.location.reload();
-        })
-        .catch((err) => {
-          console.error("[DELETE] Error:", err);
-          toast.error(`Failed to delete: ${err}`);
-        });
+  const handleDeleteClick = (conn: Connection) => {
+    setConnectionToDelete(conn);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (connectionToDelete) {
+      try {
+        console.log("[DELETE] Deleting connection:", connectionToDelete.id);
+        await deleteConnection(connectionToDelete.id);
+        window.location.reload(); 
+      } catch (err) {
+        console.error("Failed to delete connection:", err);
+        toast.error("Failed to delete connection");
+      } finally {
+        setDeleteDialogOpen(false);
+        setConnectionToDelete(null);
+      }
     }
   };
+
 
   const handleModalClose = () => {
     setIsAddModalOpen(false);
@@ -257,14 +266,19 @@ export function Sidebar() {
                          </DropdownMenuItem>
                       )}
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => { console.log("[EDIT] clicked"); handleEdit(conn); }}>
+                      <DropdownMenuItem onClick={(e) => { 
+                        e.stopPropagation(); 
+                        console.log("[EDIT] clicked"); 
+                        handleEdit(conn); 
+                      }}>
                         <Edit className="h-3 w-3 mr-2" /> Edit
                       </DropdownMenuItem>
                       <DropdownMenuItem 
                         className="text-destructive focus:text-destructive"
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           console.log("[DELETE] Delete clicked for:", conn.id);
-                          handleDelete(conn.id);
+                          handleDeleteClick(conn);
                         }}
                       >
                         <Trash className="h-3 w-3 mr-2" /> Delete
@@ -373,6 +387,12 @@ export function Sidebar() {
           }}
         />
       )}
+      <DeleteConnectionDialog 
+        isOpen={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        onConfirm={handleConfirmDelete}
+        connectionName={connectionToDelete?.name}
+      />
     </div>
   );
 }
