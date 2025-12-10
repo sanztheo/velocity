@@ -112,7 +112,7 @@ impl ConnectionPoolManager {
         }
     }
 
-    pub async fn list_tables(
+    pub async fn lfitist_tables(
         &self,
         connection_id: &str,
         limit: Option<u32>,
