@@ -91,12 +91,12 @@
 | Fonctionnalité                | TablePlus | Status | Notes          |
 | ----------------------------- | --------- | ------ | -------------- |
 | Voir schema table             | ✅        | ✅     |                |
-| Créer table (UI)              | ✅        | ❌     |                |
-| Modifier colonnes (UI)        | ✅        | ❌     |                |
-| Ajouter/supprimer colonnes    | ✅        | ❌     |                |
-| Créer/modifier indexes        | ✅        | ❌     |                |
-| Créer/modifier contraintes FK | ✅        | ❌     |                |
-| ERD / Diagramme relations     | ✅        | ❌     | D3.js ou dagre |
+| Créer table (UI)              | ✅        | ✅     |                |
+| Modifier colonnes (UI)        | ✅        | ✅     |                |
+| Ajouter/supprimer colonnes    | ✅        | ✅     |                |
+| Créer/modifier indexes        | ✅        | ✅     |                |
+| Créer/modifier contraintes FK | ✅        | ✅     |                |
+| ERD / Diagramme relations     | ✅        | ✅     | D3.js ou dagre |
 
 #### 📥 Import / Export
 

@@ -23,6 +23,7 @@ import { useConnections } from "@/hooks/useConnections";
 import { Connection } from "@/types";
 import { connectToDatabase, disconnectFromDatabase, listTables, listViews, listFunctions } from "@/lib/tauri";
 import { toast } from "sonner";
+import { CreateTableDialog } from "@/features/structure-editor";
 
 interface ConnectionState {
   isConnected: boolean;
@@ -40,6 +41,7 @@ export function Sidebar() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingConnection, setEditingConnection] = useState<Connection | null>(null);
   const [connectionStates, setConnectionStates] = useState<Record<string, ConnectionState>>({});
+  const [createTableConnectionId, setCreateTableConnectionId] = useState<string | null>(null);
 
   const { delete: deleteMutation } = useConnections();
 
@@ -216,6 +218,27 @@ export function Sidebar() {
                           <Terminal className="h-3 w-3 mr-2" /> New Query
                         </DropdownMenuItem>
                       )}
+                      {state.isConnected && (
+                         <DropdownMenuItem onClick={(e) => {
+                            e.stopPropagation();
+                            setCreateTableConnectionId(conn.id);
+                         }}>
+                            <Table className="h-3 w-3 mr-2" /> New Table
+                         </DropdownMenuItem>
+                      )}
+                      {state.isConnected && (
+                         <DropdownMenuItem onClick={(e) => {
+                            e.stopPropagation();
+                            addTab({
+                               id: `erd-${conn.id}`,
+                               title: 'ER Diagram',
+                               type: 'erd',
+                               connectionId: conn.id
+                            });
+                         }}>
+                            <FunctionSquare className="h-3 w-3 mr-2" /> View ERD
+                         </DropdownMenuItem>
+                      )}
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEdit(conn); }}>
                         <Edit className="h-3 w-3 mr-2" /> Edit
@@ -310,6 +333,26 @@ export function Sidebar() {
           />
         </DialogContent>
       </Dialog>
+      
+      {createTableConnectionId && (
+        <CreateTableDialog
+          isOpen={true}
+          onClose={() => setCreateTableConnectionId(null)}
+          connectionId={createTableConnectionId}
+          onTableCreated={async () => {
+             // Refresh tables list
+             try {
+                const tables = await listTables(createTableConnectionId);
+                setConnectionStates(prev => ({
+                   ...prev,
+                   [createTableConnectionId]: { ...prev[createTableConnectionId], tables }
+                }));
+             } catch (e) {
+                console.error("Failed to refresh tables", e);
+             }
+          }}
+        />
+      )}
     </div>
   );
 }

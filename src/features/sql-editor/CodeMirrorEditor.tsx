@@ -9,11 +9,13 @@ import { tags } from '@lezer/highlight';
 interface CodeMirrorEditorProps {
   value: string;
   onChange: (value: string) => void;
-  onExecute: () => void;
+  onExecute?: () => void;
   tables?: string[];
   columns?: Record<string, string[]>;
   dbType?: 'postgresql' | 'mysql' | 'sqlite';
   className?: string;
+  readOnly?: boolean;
+  height?: string;
 }
 
 // Custom dark theme matching the app design (#191919, #1F1F1F)
@@ -123,6 +125,8 @@ export function CodeMirrorEditor({
   columns = {},
   dbType = 'postgresql',
   className = '',
+  readOnly = false,
+  height,
 }: CodeMirrorEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -159,16 +163,22 @@ export function CodeMirrorEditor({
           onChange(update.state.doc.toString());
         }
       }),
-      keymap.of([
-        {
-          key: 'Mod-Enter',
-          run: () => {
-            onExecute();
-            return true;
-          },
-        },
-      ]),
+      EditorState.readOnly.of(readOnly),
     ];
+
+    if (onExecute) {
+      extensions.push(
+        keymap.of([
+          {
+            key: 'Mod-Enter',
+            run: () => {
+              onExecute();
+              return true;
+            },
+          },
+        ])
+      );
+    }
 
     const state = EditorState.create({
       doc: value,
@@ -185,8 +195,8 @@ export function CodeMirrorEditor({
     return () => {
       view.destroy();
     };
-  // Recreate when dbType, tables or columns change
-  }, [dbType, tables, columns]);
+  // Recreate when dbType, tables, columns or readOnly change
+  }, [dbType, tables, columns, readOnly, onExecute]);
 
   // Sync external value changes
   useEffect(() => {
@@ -204,7 +214,8 @@ export function CodeMirrorEditor({
   return (
     <div 
       ref={containerRef} 
-      className={`h-full w-full overflow-hidden rounded-md border border-[#2A2A2A] bg-[#191919] ${className}`}
+      className={`w-full overflow-hidden rounded-md border border-[#2A2A2A] bg-[#191919] ${className}`}
+      style={{ height: height || '100%' }}
     />
   );
 }

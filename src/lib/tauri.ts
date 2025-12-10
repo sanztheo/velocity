@@ -187,3 +187,100 @@ export async function aiSqlComplete(
   return await invoke("ai_sql_complete", { request });
 }
 
+// ============================================================================
+// Structure Management / DDL Bindings
+// ============================================================================
+
+import { 
+  ColumnDefinition, 
+  CreateTableRequest, 
+  IndexInfo, 
+  ForeignKeyDefinition 
+} from "@/features/structure-editor/types";
+
+// Re-export types for convenience
+export type { ColumnDefinition, CreateTableRequest, IndexInfo, ForeignKeyDefinition };
+
+export async function previewCreateTable(
+  connectionId: string, 
+  request: CreateTableRequest
+): Promise<string> {
+  return await invoke("preview_create_table", { connectionId, request });
+}
+
+export async function executeDdl(
+  connectionId: string, 
+  sql: string
+): Promise<void> {
+  return await invoke("execute_ddl", { connectionId, sql });
+}
+
+export async function previewAddColumn(
+  connectionId: string,
+  tableName: string,
+  column: ColumnDefinition
+): Promise<string> {
+  return await invoke("preview_add_column", { connectionId, tableName, column });
+}
+
+export async function previewDropColumn(
+  connectionId: string,
+  tableName: string,
+  columnName: string
+): Promise<string> {
+  return await invoke("preview_drop_column", { connectionId, tableName, columnName });
+}
+
+export async function previewModifyColumn(
+  connectionId: string,
+  tableName: string,
+  oldColumnName: string,
+  newColumn: ColumnDefinition
+): Promise<string> {
+  return await invoke("preview_modify_column", { 
+    connectionId, 
+    tableName, 
+    oldColumnName, 
+    newColumn 
+  });
+}
+
+export async function previewCreateIndex(
+  connectionId: string,
+  tableName: string,
+  index: IndexInfo
+): Promise<string> {
+  return await invoke("preview_create_index", { connectionId, tableName, index });
+}
+
+export async function previewDropIndex(
+  connectionId: string,
+  tableName: string,
+  indexName: string
+): Promise<string> {
+  return await invoke("preview_drop_index", { connectionId, tableName, indexName });
+}
+
+export async function previewAddForeignKey(
+  connectionId: string,
+  tableName: string,
+  fk: ForeignKeyDefinition
+): Promise<string> {
+  return await invoke("preview_add_foreign_key", { connectionId, tableName, fk });
+}
+
+export async function previewDropConstraint(
+  connectionId: string,
+  tableName: string,
+  constraintName: string
+): Promise<string> {
+  return await invoke("preview_drop_constraint", { connectionId, tableName, constraintName });
+}
+
+export async function getTableIndexes(
+  connectionId: string,
+  tableName: string
+): Promise<IndexInfo[]> {
+  return await invoke("get_table_indexes", { connectionId, tableName });
+}
+

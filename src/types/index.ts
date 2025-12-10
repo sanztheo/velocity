@@ -43,7 +43,7 @@ export interface Connection {
   createdAt: string;
 }
 
-export type TabType = 'query' | 'table' | 'structure';
+export type TabType = 'query' | 'table' | 'structure' | 'erd';
 
 export interface Tab {
   id: string;

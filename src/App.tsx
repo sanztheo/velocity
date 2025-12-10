@@ -3,8 +3,10 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { useAppStore } from "@/stores/app.store";
 import { Toaster } from "@/components/ui/sonner";
 import { EnhancedTableViewer } from "@/features/table-viewer";
+import { StructurePanel } from "@/features/structure-editor";
 import { SpotlightSearch } from "@/features/spotlight";
 import { SqlEditor } from "@/features/sql-editor";
+import { ERDiagram } from "@/features/erd";
 
 function App() {
   const { theme, activeTabId, tabs } = useAppStore();
@@ -41,11 +43,14 @@ function App() {
                 initialSql={activeTab.sql || ''}
               />
             )}
-            {activeTab.type === 'structure' && (
-              <div className="p-6">
-                <h1 className="text-2xl font-bold mb-2 text-foreground">{activeTab.title}</h1>
-                <div className="text-muted-foreground">Schema Viewer - Coming soon</div>
-              </div>
+            {activeTab.type === 'structure' && activeTab.connectionId && (
+              <StructurePanel 
+                connectionId={activeTab.connectionId}
+                tableName={activeTab.title}
+              />
+            )}
+            {activeTab.type === 'erd' && activeTab.connectionId && (
+              <ERDiagram connectionId={activeTab.connectionId} />
             )}
           </div>
         ) : (

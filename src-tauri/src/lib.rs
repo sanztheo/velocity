@@ -56,6 +56,17 @@ pub fn run() {
             execute_changes,
             execute_query,
             explain_query,
+            // Schema / DDL commands
+            preview_create_table,
+            execute_ddl,
+            preview_add_column,
+            preview_drop_column,
+            preview_modify_column,
+            preview_create_index,
+            preview_drop_index,
+            preview_add_foreign_key,
+            preview_drop_constraint,
+            get_table_indexes,
             // AI commands
             ai_sql_complete,
             // Keychain operations

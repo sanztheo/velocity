@@ -220,3 +220,174 @@ pub async fn explain_query(
 ) -> Result<ExplainResult, VelocityError> {
     pool_manager.explain_query(&connection_id, &sql).await
 }
+
+// ============================================================================
+// Schema / DDL Commands
+// ============================================================================
+
+use crate::db::schema_ops::{
+    self, ColumnDefinition, CreateTableRequest, ForeignKeyDefinition, IndexInfo,
+};
+
+/// Preview SQL for creating a table (returns SQL without executing)
+#[tauri::command]
+pub async fn preview_create_table(
+    connection_id: String,
+    request: CreateTableRequest,
+    pool_manager: State<'_, Arc<ConnectionPoolManager>>,
+) -> Result<String, VelocityError> {
+    let pool = pool_manager
+        .get_pool(&connection_id)
+        .await
+        .ok_or_else(|| VelocityError::Connection("Not connected".to_string()))?;
+
+    schema_ops::generate_create_table_sql(pool.as_ref(), &request)
+}
+
+/// Execute a DDL statement
+#[tauri::command]
+pub async fn execute_ddl(
+    connection_id: String,
+    sql: String,
+    pool_manager: State<'_, Arc<ConnectionPoolManager>>,
+) -> Result<(), VelocityError> {
+    let pool = pool_manager
+        .get_pool(&connection_id)
+        .await
+        .ok_or_else(|| VelocityError::Connection("Not connected".to_string()))?;
+
+    schema_ops::execute_ddl(pool.as_ref(), &sql).await
+}
+
+/// Preview SQL for adding a column
+#[tauri::command]
+pub async fn preview_add_column(
+    connection_id: String,
+    table_name: String,
+    column: ColumnDefinition,
+    pool_manager: State<'_, Arc<ConnectionPoolManager>>,
+) -> Result<String, VelocityError> {
+    let pool = pool_manager
+        .get_pool(&connection_id)
+        .await
+        .ok_or_else(|| VelocityError::Connection("Not connected".to_string()))?;
+
+    schema_ops::generate_add_column_sql(pool.as_ref(), &table_name, &column)
+}
+
+/// Preview SQL for dropping a column
+#[tauri::command]
+pub async fn preview_drop_column(
+    connection_id: String,
+    table_name: String,
+    column_name: String,
+    pool_manager: State<'_, Arc<ConnectionPoolManager>>,
+) -> Result<String, VelocityError> {
+    let pool = pool_manager
+        .get_pool(&connection_id)
+        .await
+        .ok_or_else(|| VelocityError::Connection("Not connected".to_string()))?;
+
+    schema_ops::generate_drop_column_sql(pool.as_ref(), &table_name, &column_name)
+}
+
+/// Preview SQL for modifying a column
+#[tauri::command]
+pub async fn preview_modify_column(
+    connection_id: String,
+    table_name: String,
+    old_column_name: String,
+    new_column: ColumnDefinition,
+    pool_manager: State<'_, Arc<ConnectionPoolManager>>,
+) -> Result<String, VelocityError> {
+    let pool = pool_manager
+        .get_pool(&connection_id)
+        .await
+        .ok_or_else(|| VelocityError::Connection("Not connected".to_string()))?;
+
+    schema_ops::generate_modify_column_sql(
+        pool.as_ref(),
+        &table_name,
+        &old_column_name,
+        &new_column,
+    )
+}
+
+/// Preview SQL for creating an index
+#[tauri::command]
+pub async fn preview_create_index(
+    connection_id: String,
+    table_name: String,
+    index: IndexInfo,
+    pool_manager: State<'_, Arc<ConnectionPoolManager>>,
+) -> Result<String, VelocityError> {
+    let pool = pool_manager
+        .get_pool(&connection_id)
+        .await
+        .ok_or_else(|| VelocityError::Connection("Not connected".to_string()))?;
+
+    schema_ops::generate_create_index_sql(pool.as_ref(), &table_name, &index)
+}
+
+/// Preview SQL for dropping an index
+#[tauri::command]
+pub async fn preview_drop_index(
+    connection_id: String,
+    table_name: String,
+    index_name: String,
+    pool_manager: State<'_, Arc<ConnectionPoolManager>>,
+) -> Result<String, VelocityError> {
+    let pool = pool_manager
+        .get_pool(&connection_id)
+        .await
+        .ok_or_else(|| VelocityError::Connection("Not connected".to_string()))?;
+
+    schema_ops::generate_drop_index_sql(pool.as_ref(), &table_name, &index_name)
+}
+
+/// Preview SQL for adding a foreign key
+#[tauri::command]
+pub async fn preview_add_foreign_key(
+    connection_id: String,
+    table_name: String,
+    fk: ForeignKeyDefinition,
+    pool_manager: State<'_, Arc<ConnectionPoolManager>>,
+) -> Result<String, VelocityError> {
+    let pool = pool_manager
+        .get_pool(&connection_id)
+        .await
+        .ok_or_else(|| VelocityError::Connection("Not connected".to_string()))?;
+
+    schema_ops::generate_add_foreign_key_sql(pool.as_ref(), &table_name, &fk)
+}
+
+/// Preview SQL for dropping a constraint
+#[tauri::command]
+pub async fn preview_drop_constraint(
+    connection_id: String,
+    table_name: String,
+    constraint_name: String,
+    pool_manager: State<'_, Arc<ConnectionPoolManager>>,
+) -> Result<String, VelocityError> {
+    let pool = pool_manager
+        .get_pool(&connection_id)
+        .await
+        .ok_or_else(|| VelocityError::Connection("Not connected".to_string()))?;
+
+    schema_ops::generate_drop_constraint_sql(pool.as_ref(), &table_name, &constraint_name)
+}
+
+/// Get indexes for a table
+#[tauri::command]
+pub async fn get_table_indexes(
+    connection_id: String,
+    table_name: String,
+    pool_manager: State<'_, Arc<ConnectionPoolManager>>,
+) -> Result<Vec<IndexInfo>, VelocityError> {
+    let pool = pool_manager
+        .get_pool(&connection_id)
+        .await
+        .ok_or_else(|| VelocityError::Connection("Not connected".to_string()))?;
+
+    schema_ops::get_table_indexes(pool.as_ref(), &table_name).await
+}
