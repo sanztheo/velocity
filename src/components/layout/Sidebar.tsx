@@ -21,7 +21,7 @@ import {
 import { ConnectionForm } from "@/components/connections/ConnectionForm";
 import { useConnections } from "@/hooks/useConnections";
 import { Connection } from "@/types";
-import { connectToDatabase, disconnectFromDatabase, listTables, listViews, listFunctions } from "@/lib/tauri";
+import { connectToDatabase, disconnectFromDatabase, listTables, listViews, listFunctions, deleteConnection } from "@/lib/tauri";
 import { toast } from "sonner";
 import { CreateTableDialog } from "@/features/structure-editor";
 
@@ -125,18 +125,21 @@ export function Sidebar() {
     setIsAddModalOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    console.log("[DELETE] Deleting connection:", id);
-    if (confirm("Are you sure you want to delete this connection?")) {
-      try {
-        console.log("[DELETE] Confirmed, calling mutation...");
-        await deleteMutation.mutateAsync(id);
-        console.log("[DELETE] Success!");
-      } catch (error) {
-        console.error("[DELETE] Error:", error);
-      }
-    } else {
-      console.log("[DELETE] Cancelled by user");
+  const handleDelete = (id: string) => {
+    console.log("[DELETE] handleDelete called for:", id);
+    const confirmed = window.confirm("Are you sure you want to delete this connection?");
+    console.log("[DELETE] Confirmed:", confirmed);
+    if (confirmed) {
+      deleteConnection(id)
+        .then(() => {
+          console.log("[DELETE] Backend call successful");
+          // Refresh the connections list
+          window.location.reload();
+        })
+        .catch((err) => {
+          console.error("[DELETE] Error:", err);
+          toast.error(`Failed to delete: ${err}`);
+        });
     }
   };
 
@@ -254,15 +257,14 @@ export function Sidebar() {
                          </DropdownMenuItem>
                       )}
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem onSelect={() => handleEdit(conn)}>
+                      <DropdownMenuItem onClick={() => { console.log("[EDIT] clicked"); handleEdit(conn); }}>
                         <Edit className="h-3 w-3 mr-2" /> Edit
                       </DropdownMenuItem>
                       <DropdownMenuItem 
                         className="text-destructive focus:text-destructive"
-                        onSelect={() => {
-                          console.log("[DROPDOWN] Delete onSelect triggered");
-                          // Use setTimeout to let dropdown close first, then show confirm
-                          setTimeout(() => handleDelete(conn.id), 0);
+                        onClick={() => {
+                          console.log("[DELETE] Delete clicked for:", conn.id);
+                          handleDelete(conn.id);
                         }}
                       >
                         <Trash className="h-3 w-3 mr-2" /> Delete
