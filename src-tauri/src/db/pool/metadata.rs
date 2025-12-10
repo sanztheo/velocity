@@ -1,0 +1,328 @@
+use crate::error::VelocityError;
+use crate::commands::database::ForeignKeyInfo;
+use super::enums::DatabasePool;
+use super::types::ColumnInfo;
+use sqlx::Row;
+
+pub async fn list_databases(pool: &DatabasePool) -> Result<Vec<String>, VelocityError> {
+    match pool {
+        DatabasePool::Postgres(pool) => {
+            let rows: Vec<(String,)> = sqlx::query_as(
+                "SELECT datname FROM pg_database WHERE datistemplate = false ORDER BY datname",
+            )
+            .fetch_all(pool)
+            .await
+            .map_err(|e| VelocityError::Query(e.to_string()))?;
+            Ok(rows.into_iter().map(|r| r.0).collect())
+        }
+        DatabasePool::MySQL(pool) => {
+            let rows: Vec<(String,)> = sqlx::query_as("SHOW DATABASES")
+                .fetch_all(pool)
+                .await
+                .map_err(|e| VelocityError::Query(e.to_string()))?;
+            Ok(rows.into_iter().map(|r| r.0).collect())
+        }
+        DatabasePool::SQLite(_) => Ok(vec!["main".to_string()]),
+        DatabasePool::SQLServer(_) => Ok(vec!["master".to_string()]),
+        DatabasePool::Redis(_) => Ok((0..16).map(|i| format!("db{}", i)).collect()),
+    }
+}
+
+pub async fn list_tables(
+    pool: &DatabasePool,
+    limit: Option<u32>,
+    offset: Option<u32>,
+) -> Result<Vec<String>, VelocityError> {
+    println!("[VELOCITY] Executing list_tables query...");
+
+    match pool {
+        DatabasePool::Postgres(pool) => {
+            let mut query = "SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename".to_string();
+            if let Some(l) = limit {
+                query.push_str(&format!(" LIMIT {}", l));
+            }
+            if let Some(o) = offset {
+                query.push_str(&format!(" OFFSET {}", o));
+            }
+
+            let rows: Vec<(String,)> = sqlx::query_as(&query)
+                .fetch_all(pool)
+                .await
+                .map_err(|e| VelocityError::Query(e.to_string()))?;
+            Ok(rows.into_iter().map(|r| r.0).collect())
+        }
+        DatabasePool::MySQL(pool) => {
+            println!("[VELOCITY] MySQL: Using SHOW TABLES query...");
+            let mut query = "SHOW TABLES".to_string();
+            if let Some(l) = limit {
+                query.push_str(&format!(" LIMIT {}", l));
+            }
+            if let Some(o) = offset {
+                query.push_str(&format!(" OFFSET {}", o));
+            }
+
+            let rows: Vec<(String,)> = sqlx::query_as(&query)
+                .fetch_all(pool)
+                .await
+                .map_err(|e| VelocityError::Query(e.to_string()))?;
+            println!("[VELOCITY] MySQL: Got {} tables", rows.len());
+            Ok(rows.into_iter().map(|r| r.0).collect())
+        }
+        DatabasePool::SQLite(pool) => {
+            let mut query = "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name".to_string();
+            if let Some(l) = limit {
+                query.push_str(&format!(" LIMIT {}", l));
+            }
+            if let Some(o) = offset {
+                query.push_str(&format!(" OFFSET {}", o));
+            }
+
+            let rows: Vec<(String,)> = sqlx::query_as(&query)
+                .fetch_all(pool)
+                .await
+                .map_err(|e| VelocityError::Query(e.to_string()))?;
+            Ok(rows.into_iter().map(|r| r.0).collect())
+        }
+        DatabasePool::SQLServer(_) => Ok(vec![]),
+        DatabasePool::Redis(redis_pool) => {
+            let mut conn = redis_pool
+                .client
+                .get_multiplexed_async_connection()
+                .await
+                .map_err(|e| VelocityError::Connection(e.to_string()))?;
+
+            let mut keys: Vec<String> = redis::cmd("KEYS")
+                .arg("*")
+                .query_async(&mut conn)
+                .await
+                .map_err(|e| VelocityError::Query(e.to_string()))?;
+
+            keys.sort();
+
+            let start = offset.unwrap_or(0) as usize;
+            let end = if let Some(l) = limit {
+                std::cmp::min(start + l as usize, keys.len())
+            } else {
+                keys.len()
+            };
+
+            if start >= keys.len() {
+                Ok(vec![])
+            } else {
+                Ok(keys[start..end].to_vec())
+            }
+        }
+    }
+}
+
+pub async fn list_views(pool: &DatabasePool) -> Result<Vec<String>, VelocityError> {
+    match pool {
+        DatabasePool::Postgres(pool) => {
+            let rows: Vec<(String,)> = sqlx::query_as(
+                "SELECT viewname FROM pg_views WHERE schemaname = 'public' ORDER BY viewname",
+            )
+            .fetch_all(pool)
+            .await
+            .map_err(|e| VelocityError::Query(e.to_string()))?;
+            Ok(rows.into_iter().map(|r| r.0).collect())
+        }
+        DatabasePool::MySQL(pool) => {
+            let rows: Vec<(String,)> = sqlx::query_as(
+                "SELECT TABLE_NAME FROM information_schema.VIEWS WHERE TABLE_SCHEMA = DATABASE() ORDER BY TABLE_NAME"
+            ).fetch_all(pool).await.map_err(|e| VelocityError::Query(e.to_string()))?;
+            Ok(rows.into_iter().map(|r| r.0).collect())
+        }
+        DatabasePool::SQLite(pool) => {
+            let rows: Vec<(String,)> = sqlx::query_as(
+                "SELECT name FROM sqlite_master WHERE type='view' ORDER BY name",
+            )
+            .fetch_all(pool)
+            .await
+            .map_err(|e| VelocityError::Query(e.to_string()))?;
+            Ok(rows.into_iter().map(|r| r.0).collect())
+        }
+        _ => Ok(vec![]),
+    }
+}
+
+pub async fn list_functions(pool: &DatabasePool) -> Result<Vec<String>, VelocityError> {
+    match pool {
+        DatabasePool::Postgres(pool) => {
+            let rows: Vec<(String,)> = sqlx::query_as(
+                "SELECT routine_name FROM information_schema.routines WHERE routine_schema = 'public' ORDER BY routine_name"
+            ).fetch_all(pool).await.map_err(|e| VelocityError::Query(e.to_string()))?;
+            Ok(rows.into_iter().map(|r| r.0).collect())
+        }
+        DatabasePool::MySQL(pool) => {
+            let rows: Vec<(String,)> = sqlx::query_as(
+                "SELECT ROUTINE_NAME FROM information_schema.ROUTINES WHERE ROUTINE_SCHEMA = DATABASE() ORDER BY ROUTINE_NAME"
+            ).fetch_all(pool).await.map_err(|e| VelocityError::Query(e.to_string()))?;
+            Ok(rows.into_iter().map(|r| r.0).collect())
+        }
+        _ => Ok(vec![]),
+    }
+}
+
+pub async fn get_table_foreign_keys(
+    pool: &DatabasePool,
+    table_name: &str,
+) -> Result<Vec<ForeignKeyInfo>, VelocityError> {
+    match pool {
+        DatabasePool::Postgres(pool) => {
+            let rows: Vec<(String, String, String, String)> = sqlx::query_as(
+                r#"SELECT
+                    tc.constraint_name,
+                    kcu.column_name,
+                    ccu.table_name AS referenced_table,
+                    ccu.column_name AS referenced_column
+                FROM information_schema.table_constraints AS tc
+                JOIN information_schema.key_column_usage AS kcu
+                    ON tc.constraint_name = kcu.constraint_name
+                    AND tc.table_schema = kcu.table_schema
+                JOIN information_schema.constraint_column_usage AS ccu
+                    ON ccu.constraint_name = tc.constraint_name
+                    AND ccu.table_schema = tc.table_schema
+                WHERE tc.constraint_type = 'FOREIGN KEY'
+                    AND tc.table_name = $1
+                    AND tc.table_schema = 'public'
+                ORDER BY tc.constraint_name"#,
+            )
+            .bind(table_name)
+            .fetch_all(pool)
+            .await
+            .map_err(|e| VelocityError::Query(e.to_string()))?;
+
+            Ok(rows
+                .into_iter()
+                .map(
+                    |(constraint_name, column_name, referenced_table, referenced_column)| {
+                        ForeignKeyInfo {
+                            constraint_name,
+                            column_name,
+                            referenced_table,
+                            referenced_column,
+                        }
+                    },
+                )
+                .collect())
+        }
+        DatabasePool::MySQL(pool) => {
+            let rows: Vec<(String, String, String, String)> = sqlx::query_as(
+                r#"SELECT
+                    CONSTRAINT_NAME,
+                    COLUMN_NAME,
+                    REFERENCED_TABLE_NAME,
+                    REFERENCED_COLUMN_NAME
+                FROM information_schema.KEY_COLUMN_USAGE
+                WHERE TABLE_NAME = ?
+                    AND REFERENCED_TABLE_NAME IS NOT NULL
+                    AND TABLE_SCHEMA = DATABASE()
+                ORDER BY CONSTRAINT_NAME"#,
+            )
+            .bind(table_name)
+            .fetch_all(pool)
+            .await
+            .map_err(|e| VelocityError::Query(e.to_string()))?;
+
+            Ok(rows
+                .into_iter()
+                .map(
+                    |(constraint_name, column_name, referenced_table, referenced_column)| {
+                        ForeignKeyInfo {
+                            constraint_name,
+                            column_name,
+                            referenced_table,
+                            referenced_column,
+                        }
+                    },
+                )
+                .collect())
+        }
+        DatabasePool::SQLite(pool) => {
+            let rows: Vec<(i32, i32, String, String, String, String, String, String)> =
+                sqlx::query_as(&format!("PRAGMA foreign_key_list('{}')", table_name))
+                    .fetch_all(pool)
+                    .await
+                    .map_err(|e| VelocityError::Query(e.to_string()))?;
+
+            Ok(rows
+                .into_iter()
+                .map(|(id, _, table, from, to, _, _, _)| ForeignKeyInfo {
+                    constraint_name: format!("fk_{}", id),
+                    column_name: from,
+                    referenced_table: table,
+                    referenced_column: to,
+                })
+                .collect())
+        }
+        _ => Ok(vec![]),
+    }
+}
+
+pub async fn get_table_schema(
+    pool: &DatabasePool,
+    table_name: &str,
+) -> Result<Vec<ColumnInfo>, VelocityError> {
+    match pool {
+        DatabasePool::Postgres(pool) => {
+            let rows: Vec<(String, String, String, Option<i32>)> = sqlx::query_as(
+                r#"SELECT column_name, data_type, CASE WHEN is_nullable = 'YES' THEN 'YES' ELSE 'NO' END, character_maximum_length
+                FROM information_schema.columns WHERE table_name = $1 AND table_schema = 'public' ORDER BY ordinal_position"#
+            ).bind(table_name).fetch_all(pool).await.map_err(|e| VelocityError::Query(e.to_string()))?;
+
+            Ok(rows
+                .into_iter()
+                .map(|(name, data_type, nullable, max_length)| ColumnInfo {
+                    name,
+                    data_type,
+                    nullable: nullable == "YES",
+                    max_length,
+                    is_primary_key: false,
+                })
+                .collect())
+        }
+        DatabasePool::MySQL(pool) => {
+            let rows: Vec<(String, String, String, Option<i64>)> = sqlx::query_as(
+                r#"SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, CHARACTER_MAXIMUM_LENGTH
+                FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = ? ORDER BY ORDINAL_POSITION"#
+            ).bind(table_name).fetch_all(pool).await.map_err(|e| VelocityError::Query(e.to_string()))?;
+
+            Ok(rows
+                .into_iter()
+                .map(|(name, data_type, nullable, max_length)| ColumnInfo {
+                    name,
+                    data_type,
+                    nullable: nullable == "YES",
+                    max_length: max_length.map(|l| l as i32),
+                    is_primary_key: false,
+                    })
+                .collect())
+        }
+        DatabasePool::SQLite(pool) => {
+            let rows: Vec<(i32, String, String, i32, Option<String>, i32)> =
+                sqlx::query_as(&format!("PRAGMA table_info({})", table_name))
+                    .fetch_all(pool)
+                    .await
+                    .map_err(|e| VelocityError::Query(e.to_string()))?;
+
+            Ok(rows
+                .into_iter()
+                .map(|(_, name, data_type, notnull, _, pk)| ColumnInfo {
+                    name,
+                    data_type,
+                    nullable: notnull == 0,
+                    max_length: None,
+                    is_primary_key: pk == 1,
+                })
+                .collect())
+        }
+        DatabasePool::SQLServer(_) => Ok(vec![]),
+        DatabasePool::Redis(_) => Ok(vec![ColumnInfo {
+            name: "value".into(),
+            data_type: "string".into(),
+            nullable: true,
+            max_length: None,
+            is_primary_key: false,
+        }]),
+    }
+}
