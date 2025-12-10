@@ -125,10 +125,19 @@ export function Sidebar() {
     setIsAddModalOpen(true);
   };
 
-  const handleDelete = (id: string, e: React.MouseEvent) => {
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    console.log("[DELETE] Deleting connection:", id);
     if (confirm("Are you sure you want to delete this connection?")) {
-      deleteMutation.mutate(id);
+      try {
+        console.log("[DELETE] Confirmed, calling mutation...");
+        await deleteMutation.mutateAsync(id);
+        console.log("[DELETE] Success!");
+      } catch (error) {
+        console.error("[DELETE] Error:", error);
+      }
+    } else {
+      console.log("[DELETE] Cancelled by user");
     }
   };
 
