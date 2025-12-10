@@ -105,14 +105,14 @@ impl ConnectionPoolManager {
                 password,
                 ..
             } => {
-                let url = format!(
-                    "mysql://{}:{}@{}:{}/{}",
-                    username,
-                    password.as_deref().unwrap_or(""),
-                    host,
-                    port,
-                    database
-                );
+                let url = if let Some(pwd) = password.as_deref().filter(|s| !s.is_empty()) {
+                    format!(
+                        "mysql://{}:{}@{}:{}/{}",
+                        username, pwd, host, port, database
+                    )
+                } else {
+                    format!("mysql://{}@{}:{}/{}", username, host, port, database)
+                };
 
                 let pool = sqlx::mysql::MySqlPoolOptions::new()
                     .max_connections(1)
@@ -294,14 +294,14 @@ impl ConnectionPoolManager {
                 password,
                 ..
             } => {
-                let url = format!(
-                    "mysql://{}:{}@{}:{}/{}",
-                    username,
-                    password.as_deref().unwrap_or(""),
-                    host,
-                    port,
-                    database
-                );
+                let url = if let Some(pwd) = password.as_deref().filter(|s| !s.is_empty()) {
+                    format!(
+                        "mysql://{}:{}@{}:{}/{}",
+                        username, pwd, host, port, database
+                    )
+                } else {
+                    format!("mysql://{}@{}:{}/{}", username, host, port, database)
+                };
 
                 let pool = sqlx::mysql::MySqlPoolOptions::new()
                     .max_connections(5)
