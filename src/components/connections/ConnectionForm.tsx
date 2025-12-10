@@ -184,7 +184,7 @@ export function ConnectionForm({ connection, onSuccess, onCancel }: ConnectionFo
         config.port = parseInt(values.port || "5432", 10);
         config.database = values.database;
         config.username = values.username;
-        config.password = values.password || undefined;
+        config.password = values.password?.trim() || undefined;
         config.ssl = {
           enabled: values.ssl,
           mode: values.ssl ? "Require" : "Disable",
@@ -407,7 +407,7 @@ export function ConnectionForm({ connection, onSuccess, onCancel }: ConnectionFo
                         <FormControl>
                           <Input 
                             type="password" 
-                            placeholder="•••••••" 
+                            placeholder="(optional)" 
                             {...field} 
                             value={field.value || ''} 
                             className="bg-secondary border-border"
@@ -459,7 +459,7 @@ export function ConnectionForm({ connection, onSuccess, onCancel }: ConnectionFo
                   config.port = parseInt(values.port || "5432", 10);
                   config.database = values.database;
                   config.username = values.username;
-                  config.password = values.password || undefined;
+                  config.password = values.password?.trim() || undefined;
                   config.ssl = { enabled: values.ssl, mode: values.ssl ? "Require" : "Disable" };
                 }
                 
