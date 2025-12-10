@@ -35,8 +35,8 @@ export async function listDatabases(id: string): Promise<string[]> {
   return await invoke("list_databases", { id });
 }
 
-export async function listTables(id: string): Promise<string[]> {
-  return await invoke("list_tables", { id });
+export async function listTables(id: string, limit?: number, offset?: number): Promise<string[]> {
+  return await invoke("list_tables", { id, limit, offset });
 }
 
 export async function listViews(id: string): Promise<string[]> {

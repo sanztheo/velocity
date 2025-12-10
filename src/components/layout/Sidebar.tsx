@@ -70,7 +70,7 @@ export function Sidebar() {
     try {
       await connectToDatabase(conn.id);
       const [tables, views, functions] = await Promise.all([
-        listTables(conn.id),
+        listTables(conn.id, 500, 0), // Limit to 500 tables for performance
         listViews(conn.id),
         listFunctions(conn.id),
       ]);

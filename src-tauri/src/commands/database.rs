@@ -60,9 +60,11 @@ pub async fn list_databases(
 #[tauri::command]
 pub async fn list_tables(
     id: String,
+    limit: Option<u32>,
+    offset: Option<u32>,
     pool_manager: State<'_, Arc<ConnectionPoolManager>>,
 ) -> Result<Vec<String>, VelocityError> {
-    pool_manager.list_tables(&id).await
+    pool_manager.list_tables(&id, limit, offset).await
 }
 
 /// List views for a connection

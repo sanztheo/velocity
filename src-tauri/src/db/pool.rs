@@ -106,7 +106,12 @@ impl ConnectionPoolManager {
         }
     }
 
-    pub async fn list_tables(&self, connection_id: &str) -> Result<Vec<String>, VelocityError> {
+    pub async fn list_tables(
+        &self,
+        connection_id: &str,
+        limit: Option<u32>,
+        offset: Option<u32>,
+    ) -> Result<Vec<String>, VelocityError> {
         let pool = self
             .get_pool(connection_id)
             .await
@@ -114,22 +119,49 @@ impl ConnectionPoolManager {
 
         match pool.as_ref() {
             DatabasePool::Postgres(pool) => {
-                let rows: Vec<(String,)> = sqlx::query_as(
-                    "SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename"
-                ).fetch_all(pool).await.map_err(|e| VelocityError::Query(e.to_string()))?;
+                let mut query = "SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename".to_string();
+                if let Some(l) = limit {
+                    query.push_str(&format!(" LIMIT {}", l));
+                }
+                if let Some(o) = offset {
+                    query.push_str(&format!(" OFFSET {}", o));
+                }
+
+                let rows: Vec<(String,)> = sqlx::query_as(&query)
+                    .fetch_all(pool)
+                    .await
+                    .map_err(|e| VelocityError::Query(e.to_string()))?;
                 Ok(rows.into_iter().map(|r| r.0).collect())
             }
             DatabasePool::MySQL(pool) => {
-                let rows: Vec<(String,)> = sqlx::query_as("SHOW TABLES")
+                // Using information_schema for consistent pagination support
+                let mut query = "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() ORDER BY TABLE_NAME".to_string();
+                if let Some(l) = limit {
+                    query.push_str(&format!(" LIMIT {}", l));
+                }
+                if let Some(o) = offset {
+                    query.push_str(&format!(" OFFSET {}", o));
+                }
+
+                let rows: Vec<(String,)> = sqlx::query_as(&query)
                     .fetch_all(pool)
                     .await
                     .map_err(|e| VelocityError::Query(e.to_string()))?;
                 Ok(rows.into_iter().map(|r| r.0).collect())
             }
             DatabasePool::SQLite(pool) => {
-                let rows: Vec<(String,)> = sqlx::query_as(
-                    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
-                ).fetch_all(pool).await.map_err(|e| VelocityError::Query(e.to_string()))?;
+                let mut query = "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name".to_string();
+                if let Some(l) = limit {
+                    query.push_str(&format!(" LIMIT {}", l));
+                }
+                if let Some(o) = offset {
+                    query.push_str(&format!(" OFFSET {}", o));
+                }
+
+                let rows: Vec<(String,)> = sqlx::query_as(&query)
+                    .fetch_all(pool)
+                    .await
+                    .map_err(|e| VelocityError::Query(e.to_string()))?;
                 Ok(rows.into_iter().map(|r| r.0).collect())
             }
             DatabasePool::SQLServer(_) => Ok(vec![]),
@@ -139,12 +171,32 @@ impl ConnectionPoolManager {
                     .get_multiplexed_async_connection()
                     .await
                     .map_err(|e| VelocityError::Connection(e.to_string()))?;
-                let keys: Vec<String> = redis::cmd("KEYS")
+
+                // Redis doesn't support OFFSET/LIMIT on KEYS gracefully without SCAN or sorting entire list.
+                // For now, we fetch all keys and slice in memory if needed, but this is heavy.
+                // A Better approach is to use SCAN if limit is small, but SCAN returns random keys.
+                // Given the requirement is listing tables for a UI, getting all keys is the standard "bad" way.
+                // We'll stick to fetching keys and slicing for consistency with the interface, even if inefficient for Redis.
+                let mut keys: Vec<String> = redis::cmd("KEYS")
                     .arg("*")
                     .query_async(&mut conn)
                     .await
                     .map_err(|e| VelocityError::Query(e.to_string()))?;
-                Ok(keys)
+
+                keys.sort();
+
+                let start = offset.unwrap_or(0) as usize;
+                let end = if let Some(l) = limit {
+                    std::cmp::min(start + l as usize, keys.len())
+                } else {
+                    keys.len()
+                };
+
+                if start >= keys.len() {
+                    Ok(vec![])
+                } else {
+                    Ok(keys[start..end].to_vec())
+                }
             }
         }
     }
