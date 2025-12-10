@@ -1,3 +1,4 @@
+pub mod factory;
 pub mod filters;
 pub mod pool;
 pub mod query;
