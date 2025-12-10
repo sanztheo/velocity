@@ -48,12 +48,23 @@ export function FilterBar({
 
   const handleAddFilter = () => {
     if (!newColumn) return;
-    onAddFilter(newColumn, newOperator, VALUE_LESS_OPERATORS.includes(newOperator) ? undefined : newValue);
+    
+    let value: unknown;
+    if (VALUE_LESS_OPERATORS.includes(newOperator)) {
+      value = undefined;
+    } else if (newOperator === 'in') {
+      // Convert comma-separated string to array for IN operator
+      value = newValue.split(',').map(v => v.trim()).filter(v => v.length > 0);
+    } else {
+      value = newValue;
+    }
+    
+    onAddFilter(newColumn, newOperator, value);
     setNewColumn('');
     setNewValue('');
   };
 
-  const operators: FilterOperator[] = ['equals', 'notEquals', 'like', 'isNull', 'isNotNull', 'greaterThan', 'lessThan'];
+  const operators: FilterOperator[] = ['equals', 'notEquals', 'like', 'in', 'isNull', 'isNotNull', 'greaterThan', 'lessThan'];
 
   return (
     <div className={cn("flex flex-col gap-2 p-2 bg-secondary/30 border-b border-border", className)}>
@@ -122,7 +133,7 @@ export function FilterBar({
           <Input
             value={newValue}
             onChange={(e) => setNewValue(e.target.value)}
-            placeholder="Value..."
+            placeholder={newOperator === 'in' ? "val1, val2, val3..." : "Value..."}
             className="w-[150px] h-8 text-xs"
             onKeyDown={(e) => e.key === 'Enter' && handleAddFilter()}
           />

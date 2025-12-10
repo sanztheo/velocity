@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useAppStore } from "@/stores/app.store";
 import { Toaster } from "@/components/ui/sonner";
-import { TableViewer } from "@/components/tables/TableViewer";
+import { EnhancedTableViewer } from "@/features/table-viewer";
 import { SpotlightSearch } from "@/features/spotlight";
 import { SqlEditor } from "@/features/sql-editor";
 
@@ -30,7 +30,7 @@ function App() {
         {activeTab ? (
           <div className="h-full flex flex-col">
             {activeTab.type === 'table' && activeTab.connectionId && (
-              <TableViewer 
+              <EnhancedTableViewer 
                 connectionId={activeTab.connectionId} 
                 tableName={activeTab.title}
               />

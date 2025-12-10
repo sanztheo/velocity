@@ -74,17 +74,17 @@
 
 #### 🔍 Filtrage et Recherche
 
-| Fonctionnalité             | TablePlus | Status | Notes       |
-| -------------------------- | --------- | ------ | ----------- |
-| Tri colonnes (clic header) | ✅        | ❌     |             |
-| Filtre égalité (=)         | ✅        | ❌     |             |
-| Filtre contient (LIKE)     | ✅        | ❌     |             |
-| Filtre IS NULL             | ✅        | ❌     |             |
-| Filtre IN (...)            | ✅        | ❌     |             |
-| Filtres combinés (AND/OR)  | ✅        | ❌     |             |
-| Pagination                 | ✅        | ✅     | Server-side |
-| Jump to page               | ✅        | ❌     |             |
-| Rows per page config       | ✅        | ❌     |             |
+| Fonctionnalité             | TablePlus | Status | Notes                 |
+| -------------------------- | --------- | ------ | --------------------- |
+| Tri colonnes (clic header) | ✅        | ✅     | SortableHeader        |
+| Filtre égalité (=)         | ✅        | ✅     | FilterBar             |
+| Filtre contient (LIKE)     | ✅        | ✅     | ILIKE search          |
+| Filtre IS NULL             | ✅        | ✅     | IS NULL / IS NOT NULL |
+| Filtre IN (...)            | ✅        | ✅     | Comma-separated       |
+| Filtres combinés (AND/OR)  | ✅        | ✅     | Toggle AND/OR         |
+| Pagination                 | ✅        | ✅     | Server-side           |
+| Jump to page               | ✅        | ✅     | Input numérique       |
+| Rows per page config       | ✅        | ✅     | 25/50/100/250/500     |
 
 #### 🏗️ Gestion de Structure
 
