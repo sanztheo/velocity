@@ -22,11 +22,11 @@ const TableNode = memo(({ data }: NodeProps<CustomNode>) => {
       </div>
       
       <div className="p-0">
-        {data.columns.map((col, index) => (
+        {data.columns.map((col) => (
           <div 
             key={col.name} 
             className={cn(
-              "flex items-center justify-between px-3 py-1.5 text-xs border-b last:border-0 hover:bg-muted/50",
+              "relative flex items-center justify-between px-3 py-1.5 text-xs border-b last:border-0 hover:bg-muted/50",
               col.isPrimaryKey && "bg-primary/5 font-medium"
             )}
           >
@@ -47,13 +47,15 @@ const TableNode = memo(({ data }: NodeProps<CustomNode>) => {
               type="target" 
               position={Position.Left} 
               id={`${col.name}-target`}
-              style={{ top: 20 + (index * 24), background: 'transparent', border: 'none' }} 
+              className="!bg-transparent !border-none !w-2 !h-2 !left-0"
+              style={{ top: '50%', transform: 'translateY(-50%)' }} 
             />
             <Handle 
               type="source" 
               position={Position.Right} 
               id={`${col.name}-source`}
-              style={{ top: 20 + (index * 24), background: 'transparent', border: 'none' }}
+              className="!bg-transparent !border-none !w-2 !h-2 !right-0"
+              style={{ top: '50%', transform: 'translateY(-50%)' }}
             />
           </div>
         ))}

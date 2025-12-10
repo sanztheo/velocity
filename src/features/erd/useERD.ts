@@ -60,8 +60,9 @@ export function useERD(connectionId: string | null) {
             sourceHandle: `${fk.columnName}-source`,
             target: fk.referencedTable,
             targetHandle: `${fk.referencedColumn}-target`,
-            animated: true,
-            style: { stroke: '#aaa' },
+            type: 'smoothstep', // Better for ERD than default bezier
+            animated: false, // Animation can be distracting in static ERD
+            style: { stroke: '#64748b', strokeWidth: 1.5 }, // slate-500
             label: fk.constraintName,
           });
         });
@@ -69,12 +70,17 @@ export function useERD(connectionId: string | null) {
 
       // Layout with Dagre
       const g = new dagre.graphlib.Graph();
-      g.setGraph({ rankdir: 'LR' });
+      g.setGraph({ 
+        rankdir: 'TB', // Top-to-Bottom creates a clearer hierarchy for schemas
+        align: 'UL',
+        nodesep: 80, // Horizontal spacing
+        ranksep: 100 // Vertical spacing between ranks
+      });
       g.setDefaultEdgeLabel(() => ({}));
 
       nodesData.forEach((node) => {
-        // Approximate height based on columns
-        const height = 40 + (node.data.columns.length * 28); 
+        // Approximate height based on columns (Header: 40px, Row: 28px)
+        const height = 40 + (node.data.columns.length * 28) + 20; // +20 buffer
         g.setNode(node.id, { width: NODE_WIDTH, height });
       });
 
