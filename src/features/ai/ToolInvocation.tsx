@@ -99,7 +99,7 @@ export function ToolInvocation({ toolName, args, status, result, error }: ToolIn
       {hasArgs ? (
         <div className="mb-2">
           <span className="text-xs text-muted-foreground block mb-1">Arguments:</span>
-          <pre className="text-xs bg-muted p-2 rounded overflow-x-auto font-mono">
+          <pre className="text-xs bg-muted p-2 rounded whitespace-pre-wrap break-all font-mono">
             {JSON.stringify(args, null, 2)}
           </pre>
         </div>
@@ -111,7 +111,7 @@ export function ToolInvocation({ toolName, args, status, result, error }: ToolIn
           <summary className="text-xs cursor-pointer text-muted-foreground hover:text-foreground">
             View Result
           </summary>
-          <pre className="text-xs bg-muted p-2 rounded mt-1 overflow-x-auto font-mono max-h-48 overflow-y-auto">
+          <pre className="text-xs bg-muted p-2 rounded mt-1 whitespace-pre-wrap break-all font-mono max-h-48 overflow-y-auto">
             {truncateResult(result)}
           </pre>
         </details>
