@@ -22,6 +22,8 @@ interface ChatInputProps {
   onModeChange: (mode: AgentMode) => void;
   provider: AIProvider;
   onProviderChange: (provider: AIProvider) => void;
+  autoAccept: boolean;
+  onAutoAcceptChange: (value: boolean) => void;
 }
 
 export function ChatInput({
@@ -36,6 +38,8 @@ export function ChatInput({
   onModeChange,
   provider,
   onProviderChange,
+  autoAccept,
+  onAutoAcceptChange,
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -107,6 +111,27 @@ export function ChatInput({
             {/* Model Selector */}
             <ModelSelector provider={provider} onChange={onProviderChange} />
             
+            <div className="w-px h-4 bg-border/50 mx-1" />
+
+            {/* Auto-Accept Toggle */}
+            <Button
+              variant="ghost" 
+              size="sm"
+              onClick={() => onAutoAcceptChange(!autoAccept)}
+              className={cn(
+                "h-6 px-2 text-[10px] gap-1.5 font-medium rounded-full transition-colors",
+                autoAccept 
+                  ? "bg-red-500/10 text-red-500 hover:bg-red-500/20" 
+                  : "text-muted-foreground hover:bg-muted/50"
+              )}
+              title={autoAccept ? "Auto-execute SQL (Dangerous)" : "Ask for confirmation"}
+            >
+              <div className={cn(
+                "w-1.5 h-1.5 rounded-full",
+                autoAccept ? "bg-red-500" : "bg-muted-foreground/50"
+              )} />
+              Auto-Run
+            </Button>
           </div>
 
           {/* Send/Stop Button */}

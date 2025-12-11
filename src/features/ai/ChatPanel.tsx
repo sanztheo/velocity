@@ -2,11 +2,9 @@
 // Main AI chat interface container
 
 import { useState, useRef, useEffect } from 'react';
-import { Bot, Key, AlertTriangle, Settings } from 'lucide-react';
+import { Bot, Key, Settings } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
 import { useVelocityAgent } from './useVelocityAgent';
 import { useAISettingsStore } from './ai-settings.store';
 import { MessageBubble } from './MessageBubble';
@@ -113,25 +111,7 @@ export function ChatPanel({ connectionId }: ChatPanelProps) {
         />
       )}
 
-      {/* Auto-accept toggle */}
-      <div className="border-t px-4 py-2 bg-muted/30 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm">
-          <Switch
-            id="auto-accept"
-            checked={autoAcceptSql}
-            onCheckedChange={setAutoAcceptSql}
-          />
-          <label htmlFor="auto-accept" className="cursor-pointer">
-            Auto-accept SQL execution
-          </label>
-        </div>
-        {autoAcceptSql && (
-          <Badge variant="destructive" className="gap-1">
-            <AlertTriangle className="h-3 w-3" />
-            No confirmation
-          </Badge>
-        )}
-      </div>
+
 
       {/* Input */}
       <ChatInput
@@ -145,6 +125,8 @@ export function ChatPanel({ connectionId }: ChatPanelProps) {
         onModeChange={setMode}
         provider={preferredProvider}
         onProviderChange={setPreferredProvider}
+        autoAccept={autoAcceptSql}
+        onAutoAcceptChange={setAutoAcceptSql}
       />
 
       {/* Settings dialog */}
