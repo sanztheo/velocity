@@ -1,4 +1,4 @@
-import { Database, MoreVertical, Loader2, Star, Plug, Unplug, Terminal, Plus, Edit, Trash, Eye } from "lucide-react";
+import { Database, MoreVertical, Loader2, Star, Plug, Plus, Edit, Trash } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -58,10 +58,11 @@ export function ConnectionListView({
             return (
               <div
                 key={conn.id}
-                className="group flex items-center justify-between text-sm p-2 rounded cursor-pointer transition-colors text-sidebar-foreground hover:bg-sidebar-hover"
+                className="group relative flex items-center text-sm p-2 pr-8 rounded cursor-pointer transition-colors text-sidebar-foreground hover:bg-sidebar-hover"
                 onDoubleClick={() => onConnect(conn)}
               >
-                <div className="flex items-center gap-2 min-w-0 flex-1">
+                {/* Connection info */}
+                <div className="flex items-center gap-2 min-w-0">
                   {isConnecting ? (
                     <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" />
                   ) : (
@@ -71,12 +72,14 @@ export function ConnectionListView({
                   {conn.favorite && <Star className="h-3 w-3 shrink-0 text-yellow-500 fill-yellow-500" />}
                 </div>
 
+                {/* Menu button - absolute right */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6"
+                      onClick={(e) => e.stopPropagation()}
                     >
                       <MoreVertical className="h-3 w-3" />
                     </Button>
