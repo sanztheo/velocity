@@ -135,6 +135,27 @@ pub async fn get_ai_api_key(provider: String) -> Result<Option<String>, Velocity
 pub struct ChatMessage {
     pub role: String,
     pub content: String,
+    /// Tool calls made by the assistant (for role="assistant")
+    pub tool_calls: Option<Vec<ToolCallMessage>>,
+    /// Tool call ID this message responds to (for role="tool")
+    pub tool_call_id: Option<String>,
+}
+
+/// A tool call in a message
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ToolCallMessage {
+    pub id: String,
+    #[serde(default)]
+    pub call_type: String,
+    pub function: ToolCallFunction,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ToolCallFunction {
+    pub name: String,
+    pub arguments: String,
 }
 
 /// Request for AI chat streaming
@@ -223,10 +244,42 @@ pub async fn ai_chat_stream(
     
     // Add conversation messages
     for msg in &request.messages {
-        api_messages.push(serde_json::json!({
-            "role": msg.role,
-            "content": msg.content
-        }));
+        match msg.role.as_str() {
+            "assistant" if msg.tool_calls.is_some() => {
+                // Assistant message with tool calls
+                let tool_calls: Vec<serde_json::Value> = msg.tool_calls.as_ref().unwrap()
+                    .iter()
+                    .map(|tc| serde_json::json!({
+                        "id": tc.id,
+                        "type": tc.call_type,
+                        "function": {
+                            "name": tc.function.name,
+                            "arguments": tc.function.arguments
+                        }
+                    }))
+                    .collect();
+                api_messages.push(serde_json::json!({
+                    "role": "assistant",
+                    "content": if msg.content.is_empty() { serde_json::Value::Null } else { serde_json::Value::String(msg.content.clone()) },
+                    "tool_calls": tool_calls
+                }));
+            }
+            "tool" if msg.tool_call_id.is_some() => {
+                // Tool result message
+                api_messages.push(serde_json::json!({
+                    "role": "tool",
+                    "tool_call_id": msg.tool_call_id,
+                    "content": msg.content
+                }));
+            }
+            _ => {
+                // Regular user/assistant/system message
+                api_messages.push(serde_json::json!({
+                    "role": msg.role,
+                    "content": msg.content
+                }));
+            }
+        }
     }
 
     // Build request payload (OpenAI/Grok format)

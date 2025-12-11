@@ -361,18 +361,25 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
           console.log('[Sending Tool Results to AI]', toolResults);
           
           // Build complete message history with tool results
+          // Format must match Rust ChatMessage struct (camelCase)
           const followUpMessages = [
             ...apiMessages,
             {
               role: 'assistant',
               content: '',
-              tool_calls: toolCallsCopy.map(tc => ({
+              // toolCalls in camelCase for Rust serde
+              toolCalls: toolCallsCopy.map(tc => ({
                 id: tc.id,
-                type: 'function',
+                callType: 'function', // callType instead of type for Rust
                 function: { name: tc.name, arguments: JSON.stringify(tc.args) }
               }))
             },
-            ...toolResults
+            // Tool result messages
+            ...toolResults.map(tr => ({
+              role: 'tool',
+              content: tr.content,
+              toolCallId: tr.tool_call_id // camelCase for Rust
+            }))
           ];
 
           // Create new channel for follow-up response
