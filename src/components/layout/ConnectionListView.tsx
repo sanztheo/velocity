@@ -1,6 +1,5 @@
 import { Database, MoreVertical, Loader2, Star, Plug, Plus, Edit, Trash } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,14 +28,14 @@ export function ConnectionListView({
   onAddNew,
 }: ConnectionListViewProps) {
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col overflow-hidden">
       {/* Header */}
-      <div className="p-4 border-b border-sidebar-border flex items-center justify-between">
-        <span className="font-semibold text-sm text-sidebar-foreground">Connections</span>
+      <div className="p-4 border-b border-sidebar-border flex items-center justify-between shrink-0">
+        <span className="font-semibold text-sm text-sidebar-foreground truncate">Connections</span>
         <Button
           variant="ghost"
           size="icon"
-          className="h-6 w-6 text-sidebar-foreground hover:text-sidebar-active-foreground hover:bg-sidebar-hover"
+          className="h-6 w-6 shrink-0 text-sidebar-foreground hover:text-sidebar-active-foreground hover:bg-sidebar-hover"
           onClick={onAddNew}
         >
           <Plus className="h-4 w-4" />
@@ -44,7 +43,7 @@ export function ConnectionListView({
       </div>
 
       {/* Connection List */}
-      <ScrollArea className="flex-1">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
         <div className="p-2 space-y-1">
           {connections.length === 0 && (
             <div className="text-xs text-muted-foreground p-4 text-center">
@@ -58,11 +57,11 @@ export function ConnectionListView({
             return (
               <div
                 key={conn.id}
-                className="group relative flex items-center text-sm p-2 pr-8 rounded cursor-pointer transition-colors text-sidebar-foreground hover:bg-sidebar-hover"
+                className="group relative flex items-center w-full text-sm p-2 pr-8 rounded cursor-pointer transition-colors text-sidebar-foreground hover:bg-sidebar-hover"
                 onDoubleClick={() => onConnect(conn)}
               >
                 {/* Connection info */}
-                <div className="flex items-center gap-2 min-w-0">
+                <div className="flex items-center gap-2 min-w-0 overflow-hidden">
                   {isConnecting ? (
                     <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" />
                   ) : (
@@ -101,7 +100,7 @@ export function ConnectionListView({
             );
           })}
         </div>
-      </ScrollArea>
+      </div>
     </div>
   );
 }
