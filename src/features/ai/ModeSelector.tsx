@@ -22,19 +22,18 @@ interface ModeSelectorProps {
 const MODES = {
   fast: {
     label: 'Fast',
-    description: 'Direct execution for simple tasks',
+    description: 'Quick responses, single-step execution',
   },
   deep: {
-    label: 'Planning', // Renamed from "Deep" to match reference "Planning" implied context
-    description: 'Deep reasoning & planning before execution',
+    label: 'Deep',
+    description: 'Extended thinking with multi-step reasoning',
   },
 };
 
 export function ModeSelector({ mode, onChange }: ModeSelectorProps) {
   const [open, setOpen] = useState(false);
   
-  // Map "deep" mode to "Planning" label for UI, but keep internal state as 'deep'
-  const currentLabel = mode === 'deep' ? 'Planning' : 'Fast';
+  const currentLabel = MODES[mode].label;
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
@@ -50,7 +49,7 @@ export function ModeSelector({ mode, onChange }: ModeSelectorProps) {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-56" side="top" sideOffset={8}>
         <DropdownMenuLabel className="text-xs text-muted-foreground font-normal px-2 pb-1">
-          Conversation mode
+          Agent mode
         </DropdownMenuLabel>
         
         <DropdownMenuItem
@@ -60,9 +59,9 @@ export function ModeSelector({ mode, onChange }: ModeSelectorProps) {
           }}
           className="flex flex-col items-start gap-0.5 py-1.5 cursor-pointer focus:bg-accent focus:text-accent-foreground"
         >
-          <div className="font-medium text-xs">Planning</div>
+          <div className="font-medium text-xs">Deep</div>
           <div className="text-[10px] text-muted-foreground leading-tight">
-            Agent can plan before executing tasks. Use for deep research.
+            Extended thinking with chain-of-thought reasoning. Slower but thorough.
           </div>
         </DropdownMenuItem>
 
@@ -75,7 +74,7 @@ export function ModeSelector({ mode, onChange }: ModeSelectorProps) {
         >
           <div className="font-medium text-xs">Fast</div>
           <div className="text-[10px] text-muted-foreground leading-tight">
-            Agent will execute tasks directly. Quicker response time.
+            Quick responses for simple tasks. Single-step execution.
           </div>
         </DropdownMenuItem>
       </DropdownMenuContent>

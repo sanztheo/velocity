@@ -93,7 +93,7 @@ After completing operations, confirm what was done.
 export const AI_MODE_CONFIGS: Record<AgentModeKey, AIModeConfig> = {
   fast: {
     models: {
-      grok: 'grok-4.1-fast',
+      grok: 'grok-4-1-fast-non-reasoning',
       openai: 'gpt-4o-mini',
       gemini: 'gemini-2.0-flash',
     },
@@ -104,7 +104,7 @@ export const AI_MODE_CONFIGS: Record<AgentModeKey, AIModeConfig> = {
   },
   deep: {
     models: {
-      grok: 'grok-4.1-fast-reasoning',
+      grok: 'grok-4-1-fast-reasoning',
       openai: 'o1-mini',
       gemini: 'gemini-2.5-flash-preview-05-20',
     },
