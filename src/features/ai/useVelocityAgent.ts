@@ -4,7 +4,9 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { invoke, Channel } from '@tauri-apps/api/core';
 import { useAISettingsStore, hasAnyProviderAvailable, getBestProvider } from './ai-settings.store';
+import { getModeConfig } from './ai-modes';
 import type { AgentMode, PendingSqlConfirmation } from './types';
+import type { Mention } from './useMentions';
 
 // Message types
 export interface ChatMessage {
@@ -48,7 +50,7 @@ interface UseVelocityAgentReturn {
   setInput: (input: string) => void;
   isLoading: boolean;
   error: Error | undefined;
-  append: (message: { role: 'user'; content: string }) => Promise<void>;
+  append: (message: { role: 'user'; content: string }, mentions?: Mention[], enableWebSearch?: boolean) => Promise<void>;
   reload: () => Promise<void>;
   stop: () => void;
   pendingConfirmation: PendingSqlConfirmation | null;
@@ -58,36 +60,7 @@ interface UseVelocityAgentReturn {
   currentProvider: string;
 }
 
-const SYSTEM_PROMPT = `You are Velocity AI, an expert SQL developer and database administrator assistant.
-
-<core_behavior>
-YOU MUST USE YOUR TOOLS. Do NOT just describe what you would do - actually DO IT by calling the appropriate tool.
-When the user asks something about the database, ALWAYS call a tool first to get real information.
-</core_behavior>
-
-<communication>
-1. Be concise. DO NOT ask for unnecessary confirmations.
-2. Use markdown. Format SQL with \`sql\` code blocks.
-3. NEVER make up table names or data. Use tools to check.
-</communication>
-
-<workflow>
-1. **GATHER INFO FIRST**: When asked about schema/tables, IMMEDIATELY call \`list_tables\` or \`get_database_schema\`.
-2. **EXECUTE**: For operations, call the tool directly. One DDL statement at a time.
-3. **SUMMARIZE**: After execution, briefly confirm what was done.
-</workflow>
-
-<tools_usage>
-- \`list_tables\`: Get all table names. USE THIS when user asks about tables.
-- \`get_table_schema\`: Get columns of a specific table.
-- \`run_sql_query\`: Execute SELECT/INSERT/UPDATE/DELETE queries.
-- \`execute_ddl\`: Execute CREATE/ALTER/DROP statements. ONE statement per call.
-- \`get_table_preview\`: Preview data in a table.
-- \`get_table_indexes\`: Get indexes on a table.
-- \`get_table_foreign_keys\`: Get foreign key relationships.
-
-IMPORTANT: When user asks to delete/drop tables, first call \`list_tables\` to see what exists, then execute one DROP at a time.
-</tools_usage>`;
+// System prompts moved to ai-modes.ts for better separation of concerns
 
 export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions): UseVelocityAgentReturn {
   const settings = useAISettingsStore();
@@ -169,7 +142,11 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
   }, [connectionId]);
 
   // Send message and stream response
-  const append = useCallback(async (message: { role: 'user'; content: string }) => {
+  const append = useCallback(async (
+    message: { role: 'user'; content: string },
+    mentions: Mention[] = [],
+    enableWebSearch: boolean = false
+  ) => {
     setError(undefined);
     setIsLoading(true);
     pendingToolCallsRef.current = [];
@@ -196,22 +173,29 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
     setMessages(prev => [...prev, assistantMsg]);
 
     try {
-      // Determine provider
-      const provider = settings.preferredProvider || getBestProvider(settings) || 'grok';
+      // Get mode-specific configuration
+      const modeConfig = getModeConfig(mode);
       
-      // Get model based on mode
-      // Deep mode uses reasoning-capable models with extended thinking
-      let model: string | undefined;
-      if (mode === 'deep') {
-        // Reasoning models - slower but more thorough, with chain-of-thought
-        if (provider === 'grok') model = 'grok-4.1-fast-reasoning'; // Latest Grok with reasoning
-        else if (provider === 'openai') model = 'o1-mini'; // OpenAI o1 reasoning model
-        else if (provider === 'gemini') model = 'gemini-2.5-flash-preview-05-20'; // Gemini thinking model
-      } else {
-        // Fast mode - quick responses, no reasoning
-        if (provider === 'grok') model = 'grok-4.1-fast'; // Grok 4.1 fast (no reasoning)
-        else if (provider === 'openai') model = 'gpt-4o-mini';
-        else if (provider === 'gemini') model = 'gemini-2.0-flash';
+      // Determine provider
+      const provider = (settings.preferredProvider || getBestProvider(settings) || 'grok') as 'grok' | 'openai' | 'gemini';
+      
+      // Get model based on mode and provider from config
+      const model = modeConfig.models[provider];
+
+      // Build context from mentioned tables
+      let contextPrefix = '';
+      const tableMentions = mentions.filter(m => m.type === 'table');
+      if (tableMentions.length > 0) {
+        const schemaPromises = tableMentions.map(async (m) => {
+          try {
+            const schema = await invoke('get_table_schema', { connectionId, tableName: m.value });
+            return `## Table: ${m.value}\n\`\`\`json\n${JSON.stringify(schema, null, 2)}\n\`\`\``;
+          } catch {
+            return `## Table: ${m.value}\n(Failed to load schema)`;
+          }
+        });
+        const schemas = await Promise.all(schemaPromises);
+        contextPrefix = `<context>\nThe user mentioned these tables. Here is their schema:\n${schemas.join('\n\n')}\n</context>\n\n`;
       }
 
       // Build messages for API
@@ -221,7 +205,8 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
           role: m.role,
           content: m.content,
         }));
-      apiMessages.push({ role: 'user', content: message.content });
+      // Add user message with context prefix
+      apiMessages.push({ role: 'user', content: contextPrefix + message.content });
 
       // Create channel for streaming
       const channel = new Channel<AiChatChunk>();
@@ -307,9 +292,10 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
           messages: apiMessages,
           model,
           provider,
-          systemPrompt: SYSTEM_PROMPT,
-          maxTokens: 4096,
-          temperature: 0.7,
+          systemPrompt: modeConfig.systemPrompt,
+          maxTokens: modeConfig.maxTokens,
+          temperature: modeConfig.temperature,
+          enableWebSearch,
         },
         onEvent: channel,
       });
@@ -429,9 +415,9 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
               messages: followUpMessages,
               model,
               provider,
-              systemPrompt: SYSTEM_PROMPT,
-              maxTokens: 4096,
-              temperature: 0.7,
+              systemPrompt: modeConfig.systemPrompt,
+              maxTokens: modeConfig.maxTokens,
+              temperature: modeConfig.temperature,
             },
             onEvent: followUpChannel,
           });

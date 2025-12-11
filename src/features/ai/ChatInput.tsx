@@ -1,14 +1,15 @@
 // ChatInput Component
-// Input area for sending messages to the AI
-// Redesigned to match specific user reference (IDE-style)
+// Input area for sending messages to the AI with @ mention support
 
-import { useRef, useEffect } from 'react';
-import { Send, StopCircle, Plus, ArrowRight } from 'lucide-react';
+import { useRef, useEffect, useState, useCallback } from 'react';
+import { StopCircle, Plus, ArrowRight, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { ModeSelector } from './ModeSelector';
 import { ModelSelector } from './ModelSelector';
+import { MentionDropdown } from './MentionDropdown';
 import type { AgentMode, AIProvider } from './types';
+import type { Mention } from './useMentions';
 
 interface ChatInputProps {
   value: string;
@@ -24,6 +25,11 @@ interface ChatInputProps {
   onProviderChange: (provider: AIProvider) => void;
   autoAccept: boolean;
   onAutoAcceptChange: (value: boolean) => void;
+  // Mentions
+  mentions: Mention[];
+  onAddMention: (mention: Mention) => void;
+  onRemoveMention: (value: string) => void;
+  availableTables: string[];
 }
 
 export function ChatInput({
@@ -33,15 +39,23 @@ export function ChatInput({
   onStop,
   isLoading,
   disabled,
-  placeholder = "Ask about your database...",
+  placeholder = "Ask about your database... (@ to mention)",
   mode,
   onModeChange,
   provider,
   onProviderChange,
   autoAccept,
   onAutoAcceptChange,
+  mentions,
+  onAddMention,
+  onRemoveMention,
+  availableTables,
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [showMentionDropdown, setShowMentionDropdown] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [mentionStartPos, setMentionStartPos] = useState<number | null>(null);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -52,12 +66,72 @@ export function ChatInput({
     }
   }, [value]);
 
+  // Handle @ mention detection
+  const handleInputChange = useCallback((newValue: string) => {
+    onChange(newValue);
+    
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    
+    const cursorPos = textarea.selectionStart;
+    const textBeforeCursor = newValue.slice(0, cursorPos);
+    
+    // Check for @ trigger
+    const atMatch = textBeforeCursor.match(/@(\w*)$/);
+    if (atMatch) {
+      setShowMentionDropdown(true);
+      setMentionQuery(atMatch[1]);
+      setMentionStartPos(cursorPos - atMatch[0].length);
+      setSelectedIndex(0);
+    } else {
+      setShowMentionDropdown(false);
+      setMentionQuery('');
+      setMentionStartPos(null);
+    }
+  }, [onChange]);
+
+  // Handle mention selection
+  const handleSelectMention = useCallback((mention: Mention) => {
+    if (mentionStartPos !== null) {
+      // Replace @query with nothing (mention is shown as chip)
+      const beforeAt = value.slice(0, mentionStartPos);
+      const afterQuery = value.slice(mentionStartPos + mentionQuery.length + 1);
+      onChange(beforeAt + afterQuery);
+    }
+    
+    onAddMention(mention);
+    setShowMentionDropdown(false);
+    setMentionQuery('');
+    setMentionStartPos(null);
+    
+    // Focus back on textarea
+    textareaRef.current?.focus();
+  }, [mentionStartPos, mentionQuery, value, onChange, onAddMention]);
+
   const handleSubmit = () => {
     if (!value.trim() || disabled || isLoading) return;
     onSubmit();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (showMentionDropdown) {
+      // Handle arrow keys for dropdown navigation
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIndex(prev => prev + 1);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex(prev => Math.max(0, prev - 1));
+      } else if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        // Select current option - handled by dropdown
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setShowMentionDropdown(false);
+      }
+      return;
+    }
+    
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
@@ -71,12 +145,37 @@ export function ChatInput({
         "focus-within:ring-1 focus-within:ring-ring/50 focus-within:border-ring/50 transition-all duration-200"
       )}>
         
+        {/* Mention Chips */}
+        {mentions.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {mentions.map(mention => (
+              <div
+                key={`${mention.type}-${mention.value}`}
+                className={cn(
+                  "flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
+                  mention.type === 'web' 
+                    ? "bg-blue-500/10 text-blue-500" 
+                    : "bg-primary/10 text-primary"
+                )}
+              >
+                <span>{mention.displayName}</span>
+                <button
+                  onClick={() => onRemoveMention(mention.value)}
+                  className="hover:bg-black/10 rounded-full p-0.5"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Input Area */}
         <div className="relative">
           <textarea
             ref={textareaRef}
             value={value}
-            onChange={(e) => onChange(e.target.value)}
+            onChange={(e) => handleInputChange(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
             disabled={disabled || isLoading}
@@ -89,6 +188,16 @@ export function ChatInput({
             )}
             style={{ minHeight: '48px' }}
           />
+          
+          {/* Mention Dropdown */}
+          <MentionDropdown
+            isOpen={showMentionDropdown}
+            searchQuery={mentionQuery}
+            tables={availableTables}
+            onSelect={handleSelectMention}
+            onClose={() => setShowMentionDropdown(false)}
+            selectedIndex={selectedIndex}
+          />
         </div>
 
         <div className="flex w-full items-center justify-between gap-2 mt-0">
@@ -99,7 +208,11 @@ export function ChatInput({
               variant="ghost" 
               size="icon" 
               className="h-7 w-7 rounded-lg opacity-70 hover:bg-muted/50 hover:opacity-100 shrink-0"
-              title="Add context"
+              title="Add context (@)"
+              onClick={() => {
+                onChange(value + '@');
+                textareaRef.current?.focus();
+              }}
             >
               <Plus className="h-4 w-4" />
             </Button>

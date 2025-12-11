@@ -147,6 +147,7 @@ pub struct AiChatRequest {
     pub system_prompt: Option<String>,
     pub max_tokens: Option<u32>,
     pub temperature: Option<f32>,
+    pub enable_web_search: Option<bool>, // For @web mention - enables Grok's web search
 }
 
 /// Chunk types emitted during streaming
@@ -229,7 +230,7 @@ pub async fn ai_chat_stream(
     }
 
     // Build request payload (OpenAI/Grok format)
-    let payload = if provider == "gemini" {
+    let mut payload = if provider == "gemini" {
         // Gemini format
         serde_json::json!({
             "contents": request.messages.iter().map(|m| {
@@ -398,6 +399,20 @@ pub async fn ai_chat_stream(
             ]
         })
     };
+
+    // Add web_search tool if enabled (@web mention)
+    if request.enable_web_search.unwrap_or(false) && provider == "grok" {
+        if let Some(obj) = payload.as_object_mut() {
+            if let Some(tools) = obj.get_mut("tools") {
+                if let Some(tools_arr) = tools.as_array_mut() {
+                    tools_arr.push(serde_json::json!({
+                        "type": "web_search",
+                        "web_search": {}
+                    }));
+                }
+            }
+        }
+    }
 
     let client = reqwest::Client::new();
     let response = client

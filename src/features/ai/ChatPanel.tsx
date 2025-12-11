@@ -11,6 +11,7 @@ import { useAppStore } from '@/stores/app.store';
 import { MessageBubble } from './MessageBubble';
 import { ChatInput } from './ChatInput';
 import { ConfirmationPanel } from './ConfirmationPanel';
+import { useMentions } from './useMentions';
 import type { AgentMode } from './types';
 
 interface ChatPanelProps {
@@ -24,6 +25,7 @@ export function ChatPanel({ connectionId }: ChatPanelProps) {
   const { setAiPanelOpen } = useAppStore();
 
   const agent = useVelocityAgent({ connectionId, mode });
+  const mentions = useMentions({ connectionId });
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -36,7 +38,13 @@ export function ChatPanel({ connectionId }: ChatPanelProps) {
     if (!agent.input.trim()) return;
     const input = agent.input;
     agent.setInput('');
-    await agent.append({ role: 'user', content: input });
+    // Pass mentions to append for context injection
+    await agent.append({ 
+      role: 'user', 
+      content: input,
+    }, mentions.mentions, mentions.hasWebMention);
+    // Clear mentions after submit
+    mentions.clearMentions();
   };
 
   // No provider configured
@@ -80,16 +88,6 @@ export function ChatPanel({ connectionId }: ChatPanelProps) {
             <MessageBubble key={message.id} message={message} />
           ))
         )}
-        
-        {/* Loading indicator (Removed to avoid duplication with MessageBubble) */}
-        {/*
-        {agent.isLoading && !agent.pendingConfirmation && (
-          <div className="px-4 py-3 text-sm text-muted-foreground flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
-            Thinking...
-          </div>
-        )}
-        */}
 
         {/* Error display */}
         {agent.error && (
@@ -108,8 +106,6 @@ export function ChatPanel({ connectionId }: ChatPanelProps) {
         />
       )}
 
-
-
       {/* Input */}
       <ChatInput
         value={agent.input}
@@ -124,9 +120,11 @@ export function ChatPanel({ connectionId }: ChatPanelProps) {
         onProviderChange={setPreferredProvider}
         autoAccept={autoAcceptSql}
         onAutoAcceptChange={setAutoAcceptSql}
+        mentions={mentions.mentions}
+        onAddMention={mentions.addMention}
+        onRemoveMention={mentions.removeMention}
+        availableTables={mentions.availableTables}
       />
-
-
     </div>
   );
 }
