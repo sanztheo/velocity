@@ -1,8 +1,8 @@
 // Velocity AI Agent Hook
 // Core hook for chat functionality with client-side tool execution
 
-import { useState, useCallback, useMemo } from 'react';
-import { createAIProvider, hasAnyProvider } from './providers';
+import { useState, useCallback, useMemo, useEffect } from 'react';
+import { createAIProviderAsync } from './providers';
 import { 
   executeDatabaseSchemaTool,
   executeSqlQueryTool,
@@ -19,7 +19,7 @@ import {
   isSqlMutation,
   velocityToolDefinitions
 } from './tools';
-import { useAISettingsStore } from './ai-settings.store';
+import { useAISettingsStore, hasAnyProviderAvailable, getBestProvider } from './ai-settings.store';
 import type { AgentMode, PendingSqlConfirmation } from './types';
 
 // Simple message type for our UI
@@ -95,12 +95,27 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
     reject: (error: Error) => void;
   } | null>(null);
 
-  const hasProvider = useMemo(() => hasAnyProvider(settings), [settings]);
+  // Load env keys on mount
+  useEffect(() => {
+    settings.loadEnvKeys();
+  }, []);
+
+  const hasProvider = useMemo(() => hasAnyProviderAvailable(settings), [settings]);
 
   const currentProvider = useMemo(() => {
-    if (settings.grokApiKey) return 'Grok';
-    if (settings.openaiApiKey) return 'OpenAI';
-    if (settings.geminiApiKey) return 'Gemini';
+    // If we have a preferred provider and it has a key (or is available in env), use it
+    if (settings.preferredProvider) {
+      if (settings.preferredProvider === 'grok' && (settings.grokApiKey || settings.envKeysStatus?.grokAvailable)) return 'Grok';
+      if (settings.preferredProvider === 'openai' && (settings.openaiApiKey || settings.envKeysStatus?.openaiAvailable)) return 'OpenAI';
+      if (settings.preferredProvider === 'gemini' && (settings.geminiApiKey || settings.envKeysStatus?.geminiAvailable)) return 'Gemini';
+    }
+
+    // Otherwise show the best available one
+    const best = getBestProvider(settings);
+    if (best === 'grok') return 'Grok';
+    if (best === 'openai') return 'OpenAI';
+    if (best === 'gemini') return 'Gemini';
+    
     return 'None';
   }, [settings]);
 
@@ -244,7 +259,7 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
     setMessages(prev => [...prev, userMessage]);
 
     try {
-      const model = createAIProvider(settings, mode);
+      const model = await createAIProviderAsync(mode);
       
       // Import streaming function dynamically
       const { streamText } = await import('ai');

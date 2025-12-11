@@ -2,14 +2,13 @@
 // Main AI chat interface container
 
 import { useState, useRef, useEffect } from 'react';
-import { Settings, AlertTriangle, Bot, Key } from 'lucide-react';
+import { Bot, Key, AlertTriangle, Settings } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { useVelocityAgent } from './useVelocityAgent';
 import { useAISettingsStore } from './ai-settings.store';
-import { ModeSelector } from './ModeSelector';
 import { MessageBubble } from './MessageBubble';
 import { ChatInput } from './ChatInput';
 import { ConfirmationPanel } from './ConfirmationPanel';
@@ -24,7 +23,7 @@ export function ChatPanel({ connectionId }: ChatPanelProps) {
   const [mode, setMode] = useState<AgentMode>('fast');
   const [showSettings, setShowSettings] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { autoAcceptSql, setAutoAcceptSql } = useAISettingsStore();
+  const { autoAcceptSql, setAutoAcceptSql, preferredProvider, setPreferredProvider } = useAISettingsStore();
 
   const agent = useVelocityAgent({ connectionId, mode });
 
@@ -47,8 +46,6 @@ export function ChatPanel({ connectionId }: ChatPanelProps) {
     return (
       <div className="flex flex-col h-full">
         <ChatHeader
-          mode={mode}
-          onModeChange={setMode}
           provider="None"
           onOpenSettings={() => setShowSettings(true)}
         />
@@ -63,7 +60,6 @@ export function ChatPanel({ connectionId }: ChatPanelProps) {
               Add a Grok, OpenAI, or Gemini API key to start using the AI assistant.
             </p>
             <Button onClick={() => setShowSettings(true)}>
-              <Settings className="h-4 w-4 mr-2" />
               Configure API Keys
             </Button>
           </div>
@@ -78,8 +74,6 @@ export function ChatPanel({ connectionId }: ChatPanelProps) {
     <div className="flex flex-col h-full">
       {/* Header */}
       <ChatHeader
-        mode={mode}
-        onModeChange={setMode}
         provider={agent.currentProvider}
         onOpenSettings={() => setShowSettings(true)}
       />
@@ -147,6 +141,10 @@ export function ChatPanel({ connectionId }: ChatPanelProps) {
         onStop={agent.stop}
         isLoading={agent.isLoading}
         disabled={!!agent.pendingConfirmation}
+        mode={mode}
+        onModeChange={setMode}
+        provider={preferredProvider}
+        onProviderChange={setPreferredProvider}
       />
 
       {/* Settings dialog */}
@@ -157,33 +155,27 @@ export function ChatPanel({ connectionId }: ChatPanelProps) {
 
 // Header sub-component
 interface ChatHeaderProps {
-  mode: AgentMode;
-  onModeChange: (mode: AgentMode) => void;
   provider: string;
   onOpenSettings: () => void;
 }
 
-function ChatHeader({ mode, onModeChange, provider, onOpenSettings }: ChatHeaderProps) {
+function ChatHeader({ provider, onOpenSettings }: ChatHeaderProps) {
   return (
-    <div className="border-b p-4 flex items-center justify-between gap-4">
+    <div className="border-b px-4 py-3 flex items-center justify-between gap-4 bg-background/50 backdrop-blur-sm z-10">
       <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center shadow-sm">
           <Bot className="h-4 w-4 text-white" />
         </div>
         <div>
-          <h2 className="font-semibold">Velocity AI</h2>
-          <p className="text-xs text-muted-foreground">
-            Using {provider}
+          <h2 className="font-semibold text-sm">Velocity AI</h2>
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
+            {provider}
           </p>
         </div>
       </div>
-      
-      <div className="flex items-center gap-2">
-        <ModeSelector mode={mode} onChange={onModeChange} />
-        <Button variant="ghost" size="icon" onClick={onOpenSettings}>
-          <Settings className="h-4 w-4" />
-        </Button>
-      </div>
+      <Button variant="ghost" size="icon" onClick={onOpenSettings} className="h-8 w-8">
+        <Settings className="h-4 w-4 text-muted-foreground" />
+      </Button>
     </div>
   );
 }
