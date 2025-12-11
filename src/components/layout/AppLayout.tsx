@@ -7,7 +7,17 @@ import { Sidebar } from "./Sidebar";
 import { TabBar } from "./TabBar";
 import { useAppStore } from "@/stores/app.store";
 
-export function AppLayout({ children }: { children: React.ReactNode }) {
+export function AppLayout({ 
+  children,
+  rightPanel,
+  rightPanelOpen = false,
+  rightPanelSize = 25
+}: { 
+  children: React.ReactNode;
+  rightPanel?: React.ReactNode;
+  rightPanelOpen?: boolean;
+  rightPanelSize?: number;
+}) {
   const { sidebarCollapsed } = useAppStore();
 
   return (
@@ -27,7 +37,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           
           <ResizableHandle className="w-px bg-border hover:bg-primary/50 transition-colors" />
           
-          <ResizablePanel defaultSize={80}>
+          <ResizablePanel defaultSize={rightPanelOpen ? (100 - 20 - rightPanelSize) : 80}>
             <div className="flex flex-col h-full w-full bg-background">
               <TabBar />
               <main className="flex-1 overflow-auto">
@@ -35,6 +45,19 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               </main>
             </div>
           </ResizablePanel>
+
+          {rightPanel && rightPanelOpen && (
+            <>
+              <ResizableHandle className="w-px bg-border hover:bg-primary/50 transition-colors" />
+              <ResizablePanel 
+                defaultSize={rightPanelSize} 
+                minSize={20} 
+                maxSize={40}
+              >
+                {rightPanel}
+              </ResizablePanel>
+            </>
+          )}
         </ResizablePanelGroup>
       </div>
     </div>

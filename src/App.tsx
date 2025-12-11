@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useAppStore } from "@/stores/app.store";
 import { Toaster } from "@/components/ui/sonner";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { EnhancedTableViewer } from "@/features/table-viewer";
 import { StructurePanel } from "@/features/structure-editor";
 import { SpotlightSearch } from "@/features/spotlight";
@@ -31,7 +30,11 @@ function App() {
 
   return (
     <>
-      <AppLayout>
+      <AppLayout
+        rightPanel={activeConnectionId ? <ChatPanel connectionId={activeConnectionId} /> : null}
+        rightPanelOpen={aiPanelOpen}
+        rightPanelSize={30}
+      >
         {activeTab ? (
           <div className="h-full flex flex-col">
             {activeTab.type === 'table' && activeTab.connectionId && (
@@ -67,15 +70,6 @@ function App() {
           </div>
         )}
       </AppLayout>
-      
-      {/* AI Assistant Sheet */}
-      <Sheet open={aiPanelOpen} onOpenChange={setAiPanelOpen}>
-        <SheetContent side="right" className="w-[500px] sm:max-w-[500px] p-0">
-          {activeConnectionId && (
-            <ChatPanel connectionId={activeConnectionId} />
-          )}
-        </SheetContent>
-      </Sheet>
       
       <SpotlightSearch />
       <PerformanceMonitor />
