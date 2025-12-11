@@ -243,11 +243,29 @@ pub struct SafeQueryResult {
 /// This command never errors at the Tauri level - it returns structured results including failures
 #[tauri::command]
 pub async fn execute_sql_safe(
+    app_handle: tauri::AppHandle,
     connection_id: String,
     sql: String,
     pool_manager: State<'_, Arc<ConnectionPoolManager>>,
 ) -> Result<SafeQueryResult, VelocityError> {
-    Ok(match pool_manager.execute_query(&connection_id, &sql).await {
+    use tauri::Emitter;
+
+    let result = pool_manager.execute_query(&connection_id, &sql).await;
+    
+    // Check if we need to emit a schema change event (DDL / Mutations)
+    if result.is_ok() {
+        let sql_upper = sql.trim().to_uppercase();
+        let is_schema_change = sql_upper.starts_with("CREATE") 
+            || sql_upper.starts_with("DROP") 
+            || sql_upper.starts_with("ALTER")
+            || sql_upper.starts_with("TRUNCATE");
+            
+        if is_schema_change {
+            let _ = app_handle.emit("database:schema-changed", &connection_id);
+        }
+    }
+
+    Ok(match result {
         Ok(result) => SafeQueryResult {
             success: true,
             columns: Some(result.columns),
@@ -384,16 +402,25 @@ pub async fn preview_create_table(
 /// Execute a DDL statement
 #[tauri::command]
 pub async fn execute_ddl(
+    app_handle: tauri::AppHandle,
     connection_id: String,
     sql: String,
     pool_manager: State<'_, Arc<ConnectionPoolManager>>,
 ) -> Result<(), VelocityError> {
+    use tauri::Emitter;
+
     let pool = pool_manager
         .get_pool(&connection_id)
         .await
         .ok_or_else(|| VelocityError::Connection("Not connected".to_string()))?;
 
-    schema_ops::execute_ddl(pool.as_ref(), &sql).await
+    let result = schema_ops::execute_ddl(pool.as_ref(), &sql).await;
+    
+    if result.is_ok() {
+        let _ = app_handle.emit("database:schema-changed", &connection_id);
+    }
+    
+    result
 }
 
 /// Preview SQL for adding a column

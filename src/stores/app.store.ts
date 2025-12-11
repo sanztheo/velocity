@@ -61,6 +61,28 @@ export const useAppStore = create<AppState>((set) => ({
   setActiveConnection: (id) => set({ activeConnectionId: id }),
   
   openTab: (tabData) => set((state) => {
+    // Check if a tab with the same properties already exists
+    const existingTab = state.tabs.find(t => {
+      // Basic checks
+      if (t.connectionId !== tabData.connectionId || t.type !== tabData.type) {
+        return false;
+      }
+      
+      // For table tabs, check table name
+      if (t.type === 'table' && t.tableName !== tabData.tableName) {
+        return false;
+      }
+      
+      // For query tabs, we generally want new tabs, but if we wanted to prevent duplicates:
+      // if (t.type === 'query' && t.title !== tabData.title) return false;
+      
+      return true;
+    });
+
+    if (existingTab) {
+      return { activeTabId: existingTab.id };
+    }
+
     const newTab: Tab = { ...tabData, id: crypto.randomUUID() };
     return {
       tabs: [...state.tabs, newTab],

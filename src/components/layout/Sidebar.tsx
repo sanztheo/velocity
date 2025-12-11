@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { listen } from "@tauri-apps/api/event"; // Added listen import
 import { useAppStore } from "@/stores/app.store";
 import { useConnections } from "@/hooks/useConnections";
 import { Connection } from "@/types";
@@ -166,6 +167,22 @@ export function Sidebar() {
       // Ignore
     }
   };
+
+  // Listen for schema changes (from AI or other tabs)
+  useEffect(() => {
+    if (!connectedId) return;
+
+    const unlisten = listen<string>('database:schema-changed', (event) => {
+      // Only refresh if the event is for the current connection
+      if (event.payload === connectedId) {
+        refreshTables();
+      }
+    });
+
+    return () => {
+      unlisten.then(f => f());
+    };
+  }, [connectedId]);
 
   return (
     <div className="flex h-full w-full flex-col bg-sidebar border-r border-sidebar-border">
