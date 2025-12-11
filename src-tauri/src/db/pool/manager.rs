@@ -61,6 +61,7 @@ impl ConnectionPoolManager {
                     DatabasePool::SQLite(pool) => pool.close().await,
                     DatabasePool::SQLServer(_) => {}
                     DatabasePool::Redis(_) => {}
+                    DatabasePool::MongoDB(_) => {} // MongoDB client drops automatically
                 }
             }
         }

@@ -32,6 +32,8 @@ tiberius = { version = "0.12", default-features = false, features = ["rustls", "
 tokio-util = { version = "0.7", features = ["compat"] }
 # Redis support
 redis = { version = "0.24", features = ["tokio-comp", "connection-manager"] }
+# MongoDB support
+mongodb = "3"
 # Keychain/Credential Manager
 tauri-plugin-keyring = "0.1"
 # SSH Tunnel support
@@ -44,3 +46,5 @@ dotenvy = "0.15.7"
 csv = "1.3"
 rust_xlsxwriter = "0.92"
 tauri-plugin-dialog = "2"
+# For MongoDB BSON
+futures = "0.3"

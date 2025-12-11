@@ -80,6 +80,17 @@ pub enum ConnectionConfig {
         #[serde(rename = "useTls")]
         use_tls: bool,
     },
+    MongoDB {
+        host: String,
+        port: u16,
+        database: String,
+        username: Option<String>,
+        password: Option<String>,
+        #[serde(rename = "useTls")]
+        use_tls: bool,
+        #[serde(rename = "authSource")]
+        auth_source: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -111,4 +122,5 @@ pub enum DatabaseType {
     Redshift,
     SQLServer,
     Redis,
+    MongoDB,
 }

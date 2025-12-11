@@ -1,5 +1,5 @@
 use sqlx::{Pool, Postgres, MySql, Sqlite};
-use super::types::{SqlServerPool, RedisPool};
+use super::types::{SqlServerPool, RedisPool, MongoPool};
 
 /// Enum to hold different database pool types
 pub enum DatabasePool {
@@ -10,4 +10,6 @@ pub enum DatabasePool {
     SQLServer(SqlServerPool),
     // Redis client
     Redis(RedisPool),
+    // MongoDB client
+    MongoDB(MongoPool),
 }

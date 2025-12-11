@@ -3,6 +3,8 @@ use super::enums::DatabasePool;
 use super::types::TableData;
 use super::metadata::get_table_schema;
 use sqlx::Row;
+use futures::TryStreamExt;
+use mongodb::bson::Document;
 
 pub async fn get_table_data(
     pool: &DatabasePool,
@@ -143,5 +145,90 @@ pub async fn get_table_data(
                 rows,
             })
         }
+        DatabasePool::MongoDB(mongo_pool) => {
+            let db = mongo_pool.client.database(&mongo_pool.database);
+            let collection = db.collection::<Document>(table_name);
+            
+            // Fetch documents with limit and skip
+            let cursor = collection
+                .find(mongodb::bson::doc! {})
+                .limit(limit as i64)
+                .skip(offset as u64)
+                .await
+                .map_err(|e| VelocityError::Query(e.to_string()))?;
+            
+            let docs: Vec<Document> = cursor
+                .try_collect()
+                .await
+                .map_err(|e| VelocityError::Query(e.to_string()))?;
+            
+            if docs.is_empty() {
+                return Ok(TableData {
+                    columns: vec!["_id".into()],
+                    rows: vec![],
+                });
+            }
+            
+            // Extract column names from all documents (MongoDB is schemaless)
+            let mut column_set = std::collections::HashSet::new();
+            for doc in &docs {
+                for key in doc.keys() {
+                    column_set.insert(key.clone());
+                }
+            }
+            let mut columns: Vec<String> = column_set.into_iter().collect();
+            columns.sort();
+            // Ensure _id is first
+            if let Some(idx) = columns.iter().position(|c| c == "_id") {
+                columns.remove(idx);
+                columns.insert(0, "_id".to_string());
+            }
+            
+            // Convert documents to rows
+            let rows: Vec<Vec<serde_json::Value>> = docs
+                .into_iter()
+                .map(|doc| {
+                    columns
+                        .iter()
+                        .map(|col| {
+                            doc.get(col)
+                                .map(|bson| bson_to_json(bson))
+                                .unwrap_or(serde_json::Value::Null)
+                        })
+                        .collect()
+                })
+                .collect();
+            
+            Ok(TableData { columns, rows })
+        }
+    }
+}
+
+/// Convert BSON value to JSON value
+fn bson_to_json(bson: &mongodb::bson::Bson) -> serde_json::Value {
+    use mongodb::bson::Bson;
+    match bson {
+        Bson::Null => serde_json::Value::Null,
+        Bson::Boolean(b) => serde_json::Value::Bool(*b),
+        Bson::Int32(i) => serde_json::Value::Number((*i).into()),
+        Bson::Int64(i) => serde_json::Value::Number((*i).into()),
+        Bson::Double(f) => serde_json::Number::from_f64(*f)
+            .map(serde_json::Value::Number)
+            .unwrap_or(serde_json::Value::Null),
+        Bson::String(s) => serde_json::Value::String(s.clone()),
+        Bson::ObjectId(oid) => serde_json::Value::String(oid.to_hex()),
+        Bson::DateTime(dt) => serde_json::Value::String(dt.to_string()),
+        Bson::Array(arr) => serde_json::Value::Array(
+            arr.iter().map(bson_to_json).collect()
+        ),
+        Bson::Document(doc) => {
+            let map: serde_json::Map<String, serde_json::Value> = doc
+                .iter()
+                .map(|(k, v)| (k.clone(), bson_to_json(v)))
+                .collect();
+            serde_json::Value::Object(map)
+        }
+        Bson::Binary(bin) => serde_json::Value::String(format!("<binary {} bytes>", bin.bytes.len())),
+        _ => serde_json::Value::String(bson.to_string()),
     }
 }

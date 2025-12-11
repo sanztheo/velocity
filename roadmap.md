@@ -8,23 +8,25 @@
 
 #### 🔌 Connexions et Bases Supportées
 
-| Fonctionnalité                | TablePlus | Status | Notes                 |
-| ----------------------------- | --------- | ------ | --------------------- |
-| MySQL                         | ✅        | ✅     | Via sqlx              |
-| PostgreSQL                    | ✅        | ✅     | Via sqlx              |
-| SQLite                        | ✅        | ✅     | Via sqlx              |
-| MariaDB                       | ✅        | ✅     | Même driver MySQL     |
-| Microsoft SQL Server          | ✅        | ✅     | Via tiberius          |
-| Redis                         | ✅        | ✅     | Via redis-rs          |
-| CockroachDB                   | ✅        | ✅     | Compatible PostgreSQL |
-| Redshift                      | ✅        | ✅     | Compatible PostgreSQL |
-| Vertica                       | ✅        | ❌     | ODBC driver           |
-| Multi-connexions simultanées  | ✅        | ✅     | Pool manager          |
-| Multi-onglets/fenêtres        | ✅        | ✅     | Tab system            |
-| SSL/TLS                       | ✅        | ✅     | Config par connexion  |
-| SSH Tunnel                    | ✅        | ✅     | russh crate           |
-| Persistence connexions (JSON) | ✅        | ✅     | AppData config        |
-| Keychain/Credential Manager   | ✅        | ✅     | tauri-plugin-keyring  |
+| Fonctionnalité                | TablePlus | Status | Notes                       |
+| ----------------------------- | --------- | ------ | --------------------------- |
+| MySQL                         | ✅        | ✅     | Via sqlx                    |
+| PostgreSQL                    | ✅        | ✅     | Via sqlx                    |
+| SQLite                        | ✅        | ✅     | Via sqlx                    |
+| MariaDB                       | ✅        | ✅     | Même driver MySQL           |
+| Microsoft SQL Server          | ✅        | 🔄     | Connexion OK, queries TODO  |
+| Redis                         | ✅        | ✅     | Via redis-rs                |
+| CockroachDB                   | ✅        | ✅     | Compatible PostgreSQL       |
+| Redshift                      | ✅        | ✅     | Compatible PostgreSQL       |
+| MongoDB                       | ✅        | ✅     | Via mongodb crate           |
+| Cassandra                     | ✅        | ❌     | Non implémenté              |
+| Vertica                       | ✅        | ❌     | ODBC driver                 |
+| Multi-connexions simultanées  | ✅        | 🔄     | Mode single-connexion actif |
+| Multi-onglets/fenêtres        | ✅        | ✅     | Tab system                  |
+| SSL/TLS                       | ✅        | ✅     | Config par connexion        |
+| SSH Tunnel                    | ✅        | ✅     | russh crate                 |
+| Persistence connexions (JSON) | ✅        | ✅     | AppData config              |
+| Keychain/Credential Manager   | ✅        | ✅     | tauri-plugin-keyring        |
 
 #### 🗂️ Navigation et Exploration
 

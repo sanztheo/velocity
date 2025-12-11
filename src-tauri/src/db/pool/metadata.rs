@@ -25,6 +25,13 @@ pub async fn list_databases(pool: &DatabasePool) -> Result<Vec<String>, Velocity
         DatabasePool::SQLite(_) => Ok(vec!["main".to_string()]),
         DatabasePool::SQLServer(_) => Ok(vec!["master".to_string()]),
         DatabasePool::Redis(_) => Ok((0..16).map(|i| format!("db{}", i)).collect()),
+        DatabasePool::MongoDB(mongo_pool) => {
+            let dbs = mongo_pool.client
+                .list_database_names()
+                .await
+                .map_err(|e| VelocityError::Query(e.to_string()))?;
+            Ok(dbs)
+        }
     }
 }
 
@@ -110,6 +117,28 @@ pub async fn list_tables(
                 Ok(vec![])
             } else {
                 Ok(keys[start..end].to_vec())
+            }
+        }
+        DatabasePool::MongoDB(mongo_pool) => {
+            let db = mongo_pool.client.database(&mongo_pool.database);
+            let mut collections = db
+                .list_collection_names()
+                .await
+                .map_err(|e| VelocityError::Query(e.to_string()))?;
+            
+            collections.sort();
+            
+            let start = offset.unwrap_or(0) as usize;
+            let end = if let Some(l) = limit {
+                std::cmp::min(start + l as usize, collections.len())
+            } else {
+                collections.len()
+            };
+            
+            if start >= collections.len() {
+                Ok(vec![])
+            } else {
+                Ok(collections[start..end].to_vec())
             }
         }
     }
@@ -324,5 +353,16 @@ pub async fn get_table_schema(
             max_length: None,
             is_primary_key: false,
         }]),
+        DatabasePool::MongoDB(_) => {
+            // MongoDB is schemaless - return _id as the only fixed column
+            // Real columns will be inferred from documents at query time
+            Ok(vec![ColumnInfo {
+                name: "_id".into(),
+                data_type: "ObjectId".into(),
+                nullable: false,
+                max_length: None,
+                is_primary_key: true,
+            }])
+        }
     }
 }

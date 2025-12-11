@@ -171,6 +171,54 @@ impl DatabaseFactory {
 
                 Ok(DatabasePool::Redis(RedisPool { client }))
             }
+            ConnectionConfig::MongoDB {
+                host,
+                port,
+                database,
+                username,
+                password,
+                use_tls,
+                auth_source,
+            } => {
+                // Build MongoDB connection URI
+                let mut uri = String::from("mongodb://");
+                
+                // Add auth if present
+                if let (Some(user), Some(pwd)) = (username, password) {
+                    uri.push_str(&format!("{}:{}@", user, pwd));
+                }
+                
+                // Add host and port
+                uri.push_str(&format!("{}:{}", host, port));
+                
+                // Add connection options
+                let mut options = vec![];
+                if *use_tls {
+                    options.push("tls=true".to_string());
+                }
+                if let Some(auth) = auth_source {
+                    options.push(format!("authSource={}", auth));
+                }
+                // Add better timeout settings for remote connections
+                options.push("connectTimeoutMS=30000".to_string());
+                options.push("serverSelectionTimeoutMS=30000".to_string());
+                
+                if !options.is_empty() {
+                    uri.push_str(&format!("/?{}", options.join("&")));
+                }
+                
+                let client_options = mongodb::options::ClientOptions::parse(&uri)
+                    .await
+                    .map_err(|e| VelocityError::Connection(e.to_string()))?;
+                
+                let client = mongodb::Client::with_options(client_options)
+                    .map_err(|e| VelocityError::Connection(e.to_string()))?;
+                
+                Ok(DatabasePool::MongoDB(crate::db::pool::MongoPool {
+                    client,
+                    database: database.clone(),
+                }))
+            }
         }
     }
 
@@ -375,6 +423,53 @@ impl DatabaseFactory {
                     .await
                     .map_err(|e| VelocityError::Connection(e.to_string()))?;
 
+                Ok(())
+            }
+            ConnectionConfig::MongoDB {
+                host,
+                port,
+                database,
+                username,
+                password,
+                use_tls,
+                auth_source,
+            } => {
+                // Build MongoDB connection URI
+                let mut uri = String::from("mongodb://");
+                
+                if let (Some(user), Some(pwd)) = (username, password) {
+                    uri.push_str(&format!("{}:{}@", user, pwd));
+                }
+                
+                uri.push_str(&format!("{}:{}", host, port));
+                
+                let mut options = vec![];
+                if *use_tls {
+                    options.push("tls=true".to_string());
+                }
+                if let Some(auth) = auth_source {
+                    options.push(format!("authSource={}", auth));
+                }
+                options.push("connectTimeoutMS=30000".to_string());
+                options.push("serverSelectionTimeoutMS=30000".to_string());
+                
+                if !options.is_empty() {
+                    uri.push_str(&format!("/?{}", options.join("&")));
+                }
+                
+                let client_options = mongodb::options::ClientOptions::parse(&uri)
+                    .await
+                    .map_err(|e| VelocityError::Connection(e.to_string()))?;
+                
+                let client = mongodb::Client::with_options(client_options)
+                    .map_err(|e| VelocityError::Connection(e.to_string()))?;
+                
+                // Ping the database to test connection
+                let db = client.database(database);
+                db.run_command(mongodb::bson::doc! { "ping": 1 })
+                    .await
+                    .map_err(|e| VelocityError::Connection(e.to_string()))?;
+                
                 Ok(())
             }
         }

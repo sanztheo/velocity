@@ -202,6 +202,9 @@ pub async fn fetch_table_data(
         DatabasePool::SQLServer(_) => Err(VelocityError::Query(
             "SQL Server support coming soon".to_string(),
         )),
+        DatabasePool::MongoDB(_) => Err(VelocityError::Query(
+            "MongoDB uses get_table_data, not fetch_table_data".to_string(),
+        )),
     }
 }
 

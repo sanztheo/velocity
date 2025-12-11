@@ -6,7 +6,8 @@ export type DatabaseType =
   | 'CockroachDB'
   | 'Redshift'
   | 'SQLServer'
-  | 'Redis';
+  | 'Redis'
+  | 'MongoDB';
 
 export interface SslConfig {
   enabled: boolean;
@@ -30,6 +31,8 @@ export interface ConnectionConfig {
   trustServerCertificate?: boolean;
   // Redis specific
   useTls?: boolean;
+  // MongoDB specific
+  authSource?: string; // Usually "admin"
 }
 
 export interface Connection {

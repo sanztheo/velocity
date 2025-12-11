@@ -9,4 +9,4 @@ pub mod manager;
 // Re-export key items to maintain API compatibility
 pub use manager::ConnectionPoolManager;
 pub use enums::DatabasePool;
-pub use types::{SqlServerPool, RedisPool, ColumnInfo, TableData};
+pub use types::{SqlServerPool, RedisPool, MongoPool, ColumnInfo, TableData};

@@ -12,6 +12,12 @@ pub struct RedisPool {
     pub client: redis::Client,
 }
 
+/// MongoDB connection wrapper
+pub struct MongoPool {
+    pub client: mongodb::Client,
+    pub database: String,
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ColumnInfo {
