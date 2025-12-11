@@ -7,6 +7,15 @@ import {
   executeDatabaseSchemaTool,
   executeSqlQueryTool,
   executeExplainTool,
+  executeListTablesTool,
+  executeGetTablePreviewTool,
+  executeGetTableSchemaTool,
+  executeGetTableIndexesTool,
+  executeGetTableForeignKeysTool,
+  executeValidateSqlTool,
+  executeCreateTableTool,
+  executeDdlTool,
+  executeGenerateInsertTemplateTool,
   isSqlMutation,
   velocityToolDefinitions
 } from './tools';
@@ -104,8 +113,10 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
     args: Record<string, unknown>
   ): Promise<unknown> => {
     switch (toolName) {
+      // Core tools
       case 'get_database_schema':
         return await executeDatabaseSchemaTool(connectionId);
+      
       case 'run_sql_query': {
         const sql = args.sql as string;
         
@@ -123,8 +134,91 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
         
         return await executeSqlQueryTool(connectionId, sql);
       }
+      
       case 'explain_query':
         return await executeExplainTool(connectionId, args.sql as string);
+      
+      // Table exploration tools  
+      case 'list_tables':
+        return await executeListTablesTool(connectionId);
+      
+      case 'get_table_preview':
+        return await executeGetTablePreviewTool(
+          connectionId, 
+          args.tableName as string, 
+          (args.limit as number) || 10
+        );
+      
+      case 'get_table_schema':
+        return await executeGetTableSchemaTool(connectionId, args.tableName as string);
+      
+      case 'get_table_indexes':
+        return await executeGetTableIndexesTool(connectionId, args.tableName as string);
+      
+      case 'get_table_foreign_keys':
+        return await executeGetTableForeignKeysTool(connectionId, args.tableName as string);
+      
+      // SQL validation
+      case 'validate_sql':
+        return await executeValidateSqlTool(connectionId, args.sql as string);
+      
+      // Schema modification tools (require confirmation for DDL)
+      case 'create_table': {
+        const columns = args.columns as Array<{
+          name: string;
+          dataType: string;
+          isNullable?: boolean;
+          isPrimaryKey?: boolean;
+          defaultValue?: string;
+        }>;
+        
+        // Build the SQL for confirmation display
+        const columnDefs = columns.map(col => {
+          let def = `"${col.name}" ${col.dataType}`;
+          if (col.isPrimaryKey) def += ' PRIMARY KEY';
+          if (!col.isNullable && !col.isPrimaryKey) def += ' NOT NULL';
+          if (col.defaultValue) def += ` DEFAULT ${col.defaultValue}`;
+          return def;
+        }).join(', ');
+        const sql = `CREATE TABLE "${args.tableName}" (${columnDefs})`;
+        
+        // DDL always needs confirmation unless auto-accept
+        if (!settings.autoAcceptSql) {
+          return new Promise((resolve, reject) => {
+            setPendingConfirmation({
+              toolCallId: generateId(),
+              sql,
+              isMutation: true,
+            });
+            setPendingResolve({ resolve, reject });
+          });
+        }
+        
+        return await executeCreateTableTool(connectionId, args.tableName as string, columns);
+      }
+      
+      case 'execute_ddl': {
+        const sql = args.sql as string;
+        
+        // DDL always needs confirmation unless auto-accept
+        if (!settings.autoAcceptSql) {
+          return new Promise((resolve, reject) => {
+            setPendingConfirmation({
+              toolCallId: generateId(),
+              sql,
+              isMutation: true,
+            });
+            setPendingResolve({ resolve, reject });
+          });
+        }
+        
+        return await executeDdlTool(connectionId, sql);
+      }
+      
+      // Helper tools
+      case 'generate_insert_template':
+        return await executeGenerateInsertTemplateTool(connectionId, args.tableName as string);
+      
       default:
         throw new Error(`Unknown tool: ${toolName}`);
     }
