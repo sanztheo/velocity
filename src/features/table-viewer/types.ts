@@ -24,18 +24,33 @@ export interface SortConfig {
 
 export type FilterLogic = 'and' | 'or';
 
+// Cursor-based pagination (faster than offset for large tables)
+export type CursorDirection = 'after' | 'before';
+
+export interface CursorConfig {
+  column: string;         // Column to use for cursor (should be indexed)
+  direction: CursorDirection;
+  value: unknown;         // Last seen value
+}
+
 export interface QueryOptions {
   filters: ColumnFilter[];
   filterLogic: FilterLogic;
   sort: SortConfig | null;
   limit: number;
   offset: number;
+  
+  // Performance options
+  cursor?: CursorConfig;      // Use cursor pagination instead of offset
+  skipCount?: boolean;        // Skip expensive COUNT(*) query
+  selectedColumns?: string[]; // Only fetch specific columns
 }
 
 export interface TableDataResponse {
   columns: string[];
   rows: unknown[][];
-  totalCount: number;
+  totalCount: number | null; // null when skip_count is true
+  nextCursor?: unknown; // Cursor value for next page (keyset pagination)
 }
 
 // Helper to create default query options

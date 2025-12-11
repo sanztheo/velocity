@@ -14,7 +14,10 @@ use sqlx::Row;
 pub struct TableDataResponse {
     pub columns: Vec<String>,
     pub rows: Vec<Vec<serde_json::Value>>,
-    pub total_count: i64,
+    /// Total count of rows matching filters (None if skip_count was true)
+    pub total_count: Option<i64>,
+    /// Next cursor value for pagination (last row's cursor column value)
+    pub next_cursor: Option<serde_json::Value>,
 }
 
 /// Fetch table data with filtering, sorting, and pagination
@@ -24,41 +27,77 @@ pub async fn fetch_table_data(
     columns: &[ColumnInfo],
     options: &QueryOptions,
 ) -> Result<TableDataResponse, VelocityError> {
-    let column_names: Vec<String> = columns.iter().map(|c| c.name.clone()).collect();
+    // Use selected columns if specified, otherwise use all columns from schema
+    let column_names: Vec<String> = match &options.selected_columns {
+        Some(cols) if !cols.is_empty() => cols.clone(),
+        _ => columns.iter().map(|c| c.name.clone()).collect(),
+    };
 
     // Build query parts
-    let (where_clause, _params) = options.build_where_clause();
+    let (mut where_clause, _params) = options.build_where_clause();
     let order_clause = options.build_order_clause();
     let pagination = options.build_pagination_clause();
+    let select_columns = options.build_select_columns();
 
-    // For now, use simple string interpolation (safe because column names come from schema)
-    // TODO: Use proper parameterized queries for filter values
+    // Add cursor condition to WHERE clause if present
+    if let Some((cursor_condition, _cursor_param)) = options.build_cursor_clause() {
+        if where_clause.is_empty() {
+            where_clause = format!(" WHERE {}", cursor_condition);
+        } else {
+            // Append cursor condition with AND
+            where_clause = format!("{} AND {}", where_clause, cursor_condition);
+        }
+    }
+
+    // Build the main data query
     let query = format!(
-        "SELECT * FROM \"{}\"{}{}{}",
-        table_name, where_clause, order_clause, pagination
+        "SELECT {} FROM \"{}\"{}{}{}",
+        select_columns, table_name, where_clause, order_clause, pagination
     );
 
+    // Build count query (skip if skip_count is true)
+    let base_where = {
+        let (w, _) = options.build_where_clause();
+        w
+    };
     let count_query = format!(
         "SELECT COUNT(*) as count FROM \"{}\"{}",
-        table_name, where_clause
+        table_name, base_where
     );
 
+    // Helper to get next cursor value from last row
+    let get_next_cursor = |rows: &[Vec<serde_json::Value>], cursor_col: &str| -> Option<serde_json::Value> {
+        if let Some(cursor_config) = &options.cursor {
+            if let Some(last_row) = rows.last() {
+                // Find cursor column index
+                if let Some(idx) = column_names.iter().position(|c| c == cursor_col) {
+                    return last_row.get(idx).cloned();
+                }
+            }
+        }
+        None
+    };
+
     match pool {
-        DatabasePool::Postgres(pool) => {
-            // Get total count
-            let count_row = sqlx::query(&count_query)
-                .fetch_one(pool)
-                .await
-                .map_err(|e| VelocityError::Query(e.to_string()))?;
-            let total_count: i64 = count_row.try_get("count").unwrap_or(0);
+        DatabasePool::Postgres(pg_pool) => {
+            // Get total count (skip if skip_count is true)
+            let total_count: Option<i64> = if options.skip_count {
+                None
+            } else {
+                let count_row = sqlx::query(&count_query)
+                    .fetch_one(pg_pool)
+                    .await
+                    .map_err(|e| VelocityError::Query(e.to_string()))?;
+                Some(count_row.try_get("count").unwrap_or(0))
+            };
 
             // Get data
             let rows = sqlx::query(&query)
-                .fetch_all(pool)
+                .fetch_all(pg_pool)
                 .await
                 .map_err(|e| VelocityError::Query(e.to_string()))?;
 
-            let data = rows
+            let data: Vec<Vec<serde_json::Value>> = rows
                 .iter()
                 .map(|row| {
                     column_names
@@ -69,27 +108,35 @@ pub async fn fetch_table_data(
                 })
                 .collect();
 
+            let next_cursor = options.cursor.as_ref()
+                .and_then(|c| get_next_cursor(&data, &c.column));
+
             Ok(TableDataResponse {
                 columns: column_names,
                 rows: data,
                 total_count,
+                next_cursor,
             })
         }
-        DatabasePool::MySQL(pool) => {
-            // Get total count
-            let count_row = sqlx::query(&count_query)
-                .fetch_one(pool)
-                .await
-                .map_err(|e| VelocityError::Query(e.to_string()))?;
-            let total_count: i64 = count_row.try_get("count").unwrap_or(0);
+        DatabasePool::MySQL(mysql_pool) => {
+            // Get total count (skip if skip_count is true)
+            let total_count: Option<i64> = if options.skip_count {
+                None
+            } else {
+                let count_row = sqlx::query(&count_query)
+                    .fetch_one(mysql_pool)
+                    .await
+                    .map_err(|e| VelocityError::Query(e.to_string()))?;
+                Some(count_row.try_get("count").unwrap_or(0))
+            };
 
             // Get data
             let rows = sqlx::query(&query)
-                .fetch_all(pool)
+                .fetch_all(mysql_pool)
                 .await
                 .map_err(|e| VelocityError::Query(e.to_string()))?;
 
-            let data = rows
+            let data: Vec<Vec<serde_json::Value>> = rows
                 .iter()
                 .map(|row| {
                     column_names
@@ -100,27 +147,35 @@ pub async fn fetch_table_data(
                 })
                 .collect();
 
+            let next_cursor = options.cursor.as_ref()
+                .and_then(|c| get_next_cursor(&data, &c.column));
+
             Ok(TableDataResponse {
                 columns: column_names,
                 rows: data,
                 total_count,
+                next_cursor,
             })
         }
-        DatabasePool::SQLite(pool) => {
-            // Get total count
-            let count_row = sqlx::query(&count_query)
-                .fetch_one(pool)
-                .await
-                .map_err(|e| VelocityError::Query(e.to_string()))?;
-            let total_count: i64 = count_row.try_get("count").unwrap_or(0);
+        DatabasePool::SQLite(sqlite_pool) => {
+            // Get total count (skip if skip_count is true)
+            let total_count: Option<i64> = if options.skip_count {
+                None
+            } else {
+                let count_row = sqlx::query(&count_query)
+                    .fetch_one(sqlite_pool)
+                    .await
+                    .map_err(|e| VelocityError::Query(e.to_string()))?;
+                Some(count_row.try_get("count").unwrap_or(0))
+            };
 
             // Get data
             let rows = sqlx::query(&query)
-                .fetch_all(pool)
+                .fetch_all(sqlite_pool)
                 .await
                 .map_err(|e| VelocityError::Query(e.to_string()))?;
 
-            let data = rows
+            let data: Vec<Vec<serde_json::Value>> = rows
                 .iter()
                 .map(|row| {
                     column_names
@@ -131,10 +186,14 @@ pub async fn fetch_table_data(
                 })
                 .collect();
 
+            let next_cursor = options.cursor.as_ref()
+                .and_then(|c| get_next_cursor(&data, &c.column));
+
             Ok(TableDataResponse {
                 columns: column_names,
                 rows: data,
                 total_count,
+                next_cursor,
             })
         }
         DatabasePool::Redis(_) => Err(VelocityError::Query(

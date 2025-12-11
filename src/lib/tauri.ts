@@ -117,7 +117,8 @@ export interface QueryOptions {
 export interface TableDataResponse {
   columns: string[];
   rows: unknown[][];
-  totalCount: number;
+  totalCount: number | null; // null when skip_count is true
+  nextCursor?: unknown; // Cursor value for next page (keyset pagination)
 }
 
 export async function getTableDataFiltered(

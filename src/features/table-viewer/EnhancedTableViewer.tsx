@@ -99,7 +99,7 @@ export function EnhancedTableViewer({ connectionId, tableName }: EnhancedTableVi
       const result = await getTableDataFiltered(connectionId, tableName, filters.queryOptions);
       setColumns(result.columns);
       setRows(result.rows);
-      setTotalCount(result.totalCount);
+      setTotalCount(result.totalCount ?? result.rows.length);
     } catch (err) {
       setError(String(err));
     } finally {

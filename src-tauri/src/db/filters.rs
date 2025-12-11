@@ -60,6 +60,29 @@ pub enum FilterLogic {
     Or,
 }
 
+/// Direction for cursor-based pagination
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum CursorDirection {
+    #[default]
+    After,  // WHERE column > value (forward pagination)
+    Before, // WHERE column < value (backward pagination)
+}
+
+/// Cursor configuration for keyset/cursor-based pagination
+/// Much faster than OFFSET for deep pagination on large tables
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CursorConfig {
+    /// Column to use for cursor (should be indexed, typically primary key)
+    pub column: String,
+    /// Direction of pagination
+    #[serde(default)]
+    pub direction: CursorDirection,
+    /// Last seen value (the cursor position)
+    pub value: serde_json::Value,
+}
+
 /// Complete query options for table data fetching
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -73,6 +96,23 @@ pub struct QueryOptions {
     pub limit: i32,
     #[serde(default)]
     pub offset: i32,
+    
+    // === Performance options ===
+    
+    /// Cursor-based pagination (faster than OFFSET for deep pagination)
+    /// When set, offset is ignored and cursor is used instead
+    #[serde(default)]
+    pub cursor: Option<CursorConfig>,
+    
+    /// Skip expensive COUNT(*) query (useful for large tables)
+    /// When true, total_count in response will be None
+    #[serde(default)]
+    pub skip_count: bool,
+    
+    /// Specific columns to select (None = all columns)
+    /// Selecting fewer columns improves performance
+    #[serde(default)]
+    pub selected_columns: Option<Vec<String>>,
 }
 
 fn default_limit() -> i32 {
@@ -173,8 +213,31 @@ impl QueryOptions {
         (where_clause, params)
     }
 
-    /// Build ORDER BY clause
+    /// Build cursor-based WHERE condition for keyset pagination
+    /// Returns (cursor_condition, cursor_param) or None if no cursor
+    pub fn build_cursor_clause(&self) -> Option<(String, String)> {
+        self.cursor.as_ref().map(|c| {
+            let operator = match c.direction {
+                CursorDirection::After => ">",
+                CursorDirection::Before => "<",
+            };
+            let condition = format!("\"{}\" {} ?", c.column, operator);
+            let param = json_to_sql_value(&c.value);
+            (condition, param)
+        })
+    }
+
+    /// Build ORDER BY clause (with cursor-aware ordering)
     pub fn build_order_clause(&self) -> String {
+        // If using cursor, ensure we order by cursor column
+        if let Some(cursor) = &self.cursor {
+            let direction = match cursor.direction {
+                CursorDirection::After => "ASC",
+                CursorDirection::Before => "DESC",
+            };
+            return format!(" ORDER BY \"{}\" {}", cursor.column, direction);
+        }
+        
         match &self.sort {
             Some(sort) => {
                 let direction = match sort.direction {
@@ -187,9 +250,32 @@ impl QueryOptions {
         }
     }
 
-    /// Build LIMIT OFFSET clause
+    /// Build LIMIT OFFSET clause (uses cursor when available, fallback to offset)
     pub fn build_pagination_clause(&self) -> String {
+        // When using cursor, we don't need OFFSET - just LIMIT
+        if self.cursor.is_some() {
+            return format!(" LIMIT {}", self.limit);
+        }
         format!(" LIMIT {} OFFSET {}", self.limit, self.offset)
+    }
+
+    /// Build SELECT column list
+    /// Returns "*" if no specific columns selected, otherwise quoted column names
+    pub fn build_select_columns(&self) -> String {
+        match &self.selected_columns {
+            Some(cols) if !cols.is_empty() => {
+                cols.iter()
+                    .map(|c| format!("\"{}\"", c))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            }
+            _ => "*".to_string(),
+        }
+    }
+
+    /// Check if cursor pagination is being used
+    pub fn uses_cursor(&self) -> bool {
+        self.cursor.is_some()
     }
 }
 
