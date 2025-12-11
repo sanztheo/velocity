@@ -177,9 +177,13 @@ export function ConnectionForm({ connection, onSuccess, onCancel }: ConnectionFo
             form.setValue(key as any, value);
           }
         });
-        // Auto-set name from database if empty
-        if (!form.getValues("name") && parsed.database) {
-          form.setValue("name", parsed.database);
+        // Auto-set name from database if empty (but for Redis, use host instead)
+        if (!form.getValues("name")) {
+          if (parsed.dbType === "Redis" && parsed.host) {
+            form.setValue("name", `Redis @ ${parsed.host}`);
+          } else if (parsed.database) {
+            form.setValue("name", parsed.database);
+          }
         }
       }
     }
@@ -195,6 +199,14 @@ export function ConnectionForm({ connection, onSuccess, onCancel }: ConnectionFo
 
       if (values.dbType === "SQLite") {
         config.path = values.path;
+      } else if (values.dbType === "Redis") {
+        // Redis specific config
+        config.host = values.host;
+        config.port = parseInt(values.port || "6379", 10);
+        config.username = values.username || undefined;
+        config.password = values.password?.trim() || undefined;
+        config.database = parseInt(values.database || "0", 10); // Redis DB index as number
+        config.useTls = values.useTls;
       } else {
         config.host = values.host;
         config.port = parseInt(values.port || "5432", 10);
@@ -470,6 +482,14 @@ export function ConnectionForm({ connection, onSuccess, onCancel }: ConnectionFo
                 
                 if (values.dbType === "SQLite") {
                   config.path = values.path;
+                } else if (values.dbType === "Redis") {
+                  // Redis specific config
+                  config.host = values.host;
+                  config.port = parseInt(values.port || "6379", 10);
+                  config.username = values.username || undefined;
+                  config.password = values.password?.trim() || undefined;
+                  config.database = parseInt(values.database || "0", 10);
+                  config.useTls = values.useTls;
                 } else {
                   config.host = values.host;
                   config.port = parseInt(values.port || "5432", 10);

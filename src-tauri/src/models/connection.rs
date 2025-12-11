@@ -68,14 +68,16 @@ pub enum ConnectionConfig {
         username: String,
         password: Option<String>,
         encrypt: bool,
+        #[serde(rename = "trustServerCertificate")]
         trust_server_certificate: bool,
     },
     Redis {
         host: String,
         port: u16,
-        username: Option<String>, // For Redis ACL (e.g., "default")
+        username: Option<String>,
         password: Option<String>,
-        database: u8, // Redis DB index (0-15)
+        database: u8,
+        #[serde(rename = "useTls")]
         use_tls: bool,
     },
 }

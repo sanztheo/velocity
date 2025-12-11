@@ -20,7 +20,7 @@ export interface ConnectionConfig {
   type: DatabaseType;
   host?: string;
   port?: number;
-  database?: string;
+  database?: string | number; // string for SQL DBs, number for Redis (DB index 0-15)
   username?: string;
   password?: string;
   ssl?: SslConfig;
