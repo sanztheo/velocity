@@ -1,14 +1,16 @@
 // ModeSelector Component
-// Dropdown to select between FAST and DEEP AI modes
+// Toggle between Fast and Deep thinking modes
+// Styled to match IDE-style reference (minimal pill)
 
 import { useState } from 'react';
-import { Zap, Brain, ChevronDown } from 'lucide-react';
+import { ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
 import type { AgentMode } from './types';
 
@@ -17,60 +19,65 @@ interface ModeSelectorProps {
   onChange: (mode: AgentMode) => void;
 }
 
-const MODE_CONFIG = {
+const MODES = {
   fast: {
-    icon: Zap,
     label: 'Fast',
-    description: 'Execute tasks directly. Use for simple queries.',
+    description: 'Direct execution for simple tasks',
   },
   deep: {
-    icon: Brain,
-    label: 'Deep',
-    description: 'Think step by step. Use for complex analysis.',
+    label: 'Planning', // Renamed from "Deep" to match reference "Planning" implied context
+    description: 'Deep reasoning & planning before execution',
   },
 };
 
 export function ModeSelector({ mode, onChange }: ModeSelectorProps) {
   const [open, setOpen] = useState(false);
-  const currentConfig = MODE_CONFIG[mode];
-  const CurrentIcon = currentConfig.icon;
+  
+  // Map "deep" mode to "Planning" label for UI, but keep internal state as 'deep'
+  const currentLabel = mode === 'deep' ? 'Planning' : 'Fast';
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="gap-2 h-8">
-          <CurrentIcon className="h-3.5 w-3.5" />
-          <span className="text-sm">{currentConfig.label}</span>
-          <ChevronDown className="h-3 w-3 text-muted-foreground" />
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="h-6 px-1.5 gap-0.5 rounded-md hover:bg-muted/50 opacity-70 hover:opacity-100 font-normal"
+        >
+          <ChevronUp className="h-3.5 w-3.5 stroke-1" />
+          <span className="text-xs select-none">{currentLabel}</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-64">
-        {(Object.keys(MODE_CONFIG) as AgentMode[]).map((modeKey) => {
-          const config = MODE_CONFIG[modeKey];
-          const Icon = config.icon;
-          const isSelected = mode === modeKey;
-          
-          return (
-            <DropdownMenuItem
-              key={modeKey}
-              onClick={() => {
-                onChange(modeKey);
-                setOpen(false);
-              }}
-              className="flex flex-col items-start gap-1 py-3 cursor-pointer"
-            >
-              <div className="flex items-center gap-2">
-                <Icon className={`h-4 w-4 ${isSelected ? 'text-primary' : ''}`} />
-                <span className={`font-medium ${isSelected ? 'text-primary' : ''}`}>
-                  {config.label}
-                </span>
-              </div>
-              <span className="text-xs text-muted-foreground pl-6">
-                {config.description}
-              </span>
-            </DropdownMenuItem>
-          );
-        })}
+      <DropdownMenuContent align="start" className="w-56" side="top" sideOffset={8}>
+        <DropdownMenuLabel className="text-xs text-muted-foreground font-normal px-2 pb-1">
+          Conversation mode
+        </DropdownMenuLabel>
+        
+        <DropdownMenuItem
+          onClick={() => {
+            onChange('deep');
+            setOpen(false);
+          }}
+          className="flex flex-col items-start gap-0.5 py-1.5 cursor-pointer focus:bg-accent focus:text-accent-foreground"
+        >
+          <div className="font-medium text-xs">Planning</div>
+          <div className="text-[10px] text-muted-foreground leading-tight">
+            Agent can plan before executing tasks. Use for deep research.
+          </div>
+        </DropdownMenuItem>
+
+        <DropdownMenuItem
+          onClick={() => {
+            onChange('fast');
+            setOpen(false);
+          }}
+          className="flex flex-col items-start gap-0.5 py-1.5 cursor-pointer focus:bg-accent focus:text-accent-foreground"
+        >
+          <div className="font-medium text-xs">Fast</div>
+          <div className="text-[10px] text-muted-foreground leading-tight">
+            Agent will execute tasks directly. Quicker response time.
+          </div>
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

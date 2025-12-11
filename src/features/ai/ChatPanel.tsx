@@ -71,7 +71,7 @@ export function ChatPanel({ connectionId }: ChatPanelProps) {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
       <ChatHeader
         provider={agent.currentProvider}
@@ -79,7 +79,7 @@ export function ChatPanel({ connectionId }: ChatPanelProps) {
       />
 
       {/* Messages */}
-      <ScrollArea className="flex-1" ref={scrollRef}>
+      <ScrollArea className="flex-1 min-h-0 px-4" ref={scrollRef}>
         {agent.messages.length === 0 ? (
           <EmptyState />
         ) : (

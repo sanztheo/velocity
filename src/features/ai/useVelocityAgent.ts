@@ -34,6 +34,7 @@ export interface ChatMessage {
 interface MessagePart {
   type: 'text' | 'reasoning' | 'tool-invocation';
   content?: string;
+  toolCallId?: string; // Added ID for dedup
   toolName?: string;
   args?: Record<string, unknown>;
   result?: unknown;
@@ -281,34 +282,43 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
       };
       setMessages(prev => [...prev, assistantMessage]);
 
+      // Track executed tool IDs to prevent duplicates
+      const executedToolIds = new Set<string>();
+
       // Stream response - using AI SDK v5 API
       const result = streamText({
         model,
         system: SYSTEM_PROMPT,
         messages: conversationMessages,
         tools: velocityToolDefinitions,
-        // maxToolRoundtrips can be used to limit tool iterations if needed
         onStepFinish: async (step) => {
-          // Handle tool calls - use 'input' for AI SDK v5 instead of 'args'
           if (step.toolCalls && step.toolCalls.length > 0) {
             for (const toolCall of step.toolCalls) {
-              // Cast toolCall to access properties safely
-              const tc = toolCall as { toolName: string; input?: Record<string, unknown>; args?: Record<string, unknown> };
+              const tc = toolCall as { toolName: string; toolCallId: string; input?: Record<string, unknown>; args?: Record<string, unknown> };
               const toolArgs = tc.input || tc.args || {};
-              
-              // Add tool invocation to message parts
-              const toolPart: MessagePart = {
-                type: 'tool-invocation',
-                toolName: tc.toolName,
-                args: toolArgs,
-                status: 'executing',
-              };
+              const toolCallId = tc.toolCallId || `tool-${Date.now()}-${Math.random()}`;
 
+              // Skip if already executed
+              if (executedToolIds.has(toolCallId)) continue;
+              executedToolIds.add(toolCallId);
+
+              // Add to UI
               setMessages(prev => {
                 const updated = [...prev];
                 const lastMsg = updated[updated.length - 1];
                 if (lastMsg.role === 'assistant') {
-                  lastMsg.parts = [...(lastMsg.parts || []), toolPart];
+                  // Double check UI dedup just in case
+                  const existing = lastMsg.parts?.find(p => p.toolCallId === toolCallId);
+                  if (!existing) {
+                    const toolPart: MessagePart = {
+                      type: 'tool-invocation',
+                      toolCallId,
+                      toolName: tc.toolName,
+                      args: toolArgs,
+                      status: 'executing',
+                    };
+                    lastMsg.parts = [...(lastMsg.parts || []), toolPart];
+                  }
                 }
                 return updated;
               });
@@ -316,34 +326,26 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
               try {
                 const toolResult = await executeTool(tc.toolName, toolArgs);
                 
-                // Update tool status
+                // Update success
                 setMessages(prev => {
                   const updated = [...prev];
                   const lastMsg = updated[updated.length - 1];
-                  if (lastMsg.role === 'assistant' && lastMsg.parts) {
-                    const part = lastMsg.parts.find(
-                      p => p.type === 'tool-invocation' && p.toolName === tc.toolName
-                    );
-                    if (part) {
-                      part.status = 'success';
-                      part.result = toolResult;
-                    }
+                  const part = lastMsg.parts?.find(p => p.toolCallId === toolCallId);
+                  if (part) {
+                    part.status = 'success';
+                    part.result = toolResult;
                   }
                   return updated;
                 });
               } catch (toolError) {
-                // Update tool with error
+                // Update error
                 setMessages(prev => {
                   const updated = [...prev];
                   const lastMsg = updated[updated.length - 1];
-                  if (lastMsg.role === 'assistant' && lastMsg.parts) {
-                    const part = lastMsg.parts.find(
-                      p => p.type === 'tool-invocation' && p.toolName === tc.toolName
-                    );
-                    if (part) {
-                      part.status = 'error';
-                      part.error = toolError instanceof Error ? toolError.message : 'Tool failed';
-                    }
+                  const part = lastMsg.parts?.find(p => p.toolCallId === toolCallId);
+                  if (part) {
+                    part.status = 'error';
+                    part.error = toolError instanceof Error ? toolError.message : 'Tool failed';
                   }
                   return updated;
                 });

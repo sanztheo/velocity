@@ -39,8 +39,8 @@ export async function createAIProviderAsync(mode: AgentMode) {
   if (grokKey) {
     const xai = createXai({ apiKey: grokKey });
     return mode === 'deep'
-      ? xai('grok-3-mini-fast')
-      : xai('grok-3-mini-fast');
+      ? xai('grok-4-1-fast-reasoning')
+      : xai('grok-4-1-fast-non-reasoning');
   }
 
   // Fallback to OpenAI
@@ -118,7 +118,7 @@ export function hasAnyProvider(settings: { grokApiKey?: string; openaiApiKey?: s
 export function createAIProvider(settings: { grokApiKey?: string; openaiApiKey?: string; geminiApiKey?: string }, mode: AgentMode) {
   if (settings.grokApiKey) {
     const xai = createXai({ apiKey: settings.grokApiKey });
-    return mode === 'deep' ? xai('grok-3-mini-fast') : xai('grok-3-mini-fast');
+    return mode === 'deep' ? xai('grok-4-1-fast-reasoning') : xai('grok-4-1-fast-non-reasoning');
   }
   if (settings.openaiApiKey) {
     const openai = createOpenAI({ apiKey: settings.openaiApiKey });
