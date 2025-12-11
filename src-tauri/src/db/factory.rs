@@ -185,34 +185,47 @@ impl DatabaseFactory {
                 
                 // Add auth if present
                 if let (Some(user), Some(pwd)) = (username, password) {
-                    uri.push_str(&format!("{}:{}@", user, pwd));
+                    // URL encode credentials in case they contain special characters
+                    let encoded_user = urlencoding::encode(user);
+                    let encoded_pwd = urlencoding::encode(pwd);
+                    uri.push_str(&format!("{}:{}@", encoded_user, encoded_pwd));
                 }
                 
                 // Add host and port
                 uri.push_str(&format!("{}:{}", host, port));
                 
+                // Add database if specified
+                uri.push_str(&format!("/{}", database));
+                
                 // Add connection options
                 let mut options = vec![];
+                
+                // Railway uses TCP proxy - must use direct connection
+                options.push("directConnection=true".to_string());
+                
                 if *use_tls {
                     options.push("tls=true".to_string());
                 }
                 if let Some(auth) = auth_source {
                     options.push(format!("authSource={}", auth));
                 }
-                // Add better timeout settings for remote connections
-                options.push("connectTimeoutMS=30000".to_string());
-                options.push("serverSelectionTimeoutMS=30000".to_string());
                 
-                if !options.is_empty() {
-                    uri.push_str(&format!("/?{}", options.join("&")));
-                }
+                // Aggressive timeout settings for remote/proxy connections
+                options.push("connectTimeoutMS=60000".to_string());
+                options.push("serverSelectionTimeoutMS=60000".to_string());
+                options.push("socketTimeoutMS=60000".to_string());
+                options.push("maxPoolSize=5".to_string());
+                
+                uri.push_str(&format!("?{}", options.join("&")));
+                
+                println!("[VELOCITY] MongoDB URI: mongodb://[hidden]@{}:{}/{}", host, port, database);
                 
                 let client_options = mongodb::options::ClientOptions::parse(&uri)
                     .await
-                    .map_err(|e| VelocityError::Connection(e.to_string()))?;
+                    .map_err(|e| VelocityError::Connection(format!("MongoDB parse error: {}", e)))?;
                 
                 let client = mongodb::Client::with_options(client_options)
-                    .map_err(|e| VelocityError::Connection(e.to_string()))?;
+                    .map_err(|e| VelocityError::Connection(format!("MongoDB client error: {}", e)))?;
                 
                 Ok(DatabasePool::MongoDB(crate::db::pool::MongoPool {
                     client,
@@ -434,41 +447,47 @@ impl DatabaseFactory {
                 use_tls,
                 auth_source,
             } => {
-                // Build MongoDB connection URI
+                // Build MongoDB connection URI (same as create_pool)
                 let mut uri = String::from("mongodb://");
                 
                 if let (Some(user), Some(pwd)) = (username, password) {
-                    uri.push_str(&format!("{}:{}@", user, pwd));
+                    let encoded_user = urlencoding::encode(user);
+                    let encoded_pwd = urlencoding::encode(pwd);
+                    uri.push_str(&format!("{}:{}@", encoded_user, encoded_pwd));
                 }
                 
-                uri.push_str(&format!("{}:{}", host, port));
+                uri.push_str(&format!("{}:{}/{}", host, port, database));
                 
                 let mut options = vec![];
+                options.push("directConnection=true".to_string());
+                
                 if *use_tls {
                     options.push("tls=true".to_string());
                 }
                 if let Some(auth) = auth_source {
                     options.push(format!("authSource={}", auth));
                 }
-                options.push("connectTimeoutMS=30000".to_string());
-                options.push("serverSelectionTimeoutMS=30000".to_string());
                 
-                if !options.is_empty() {
-                    uri.push_str(&format!("/?{}", options.join("&")));
-                }
+                options.push("connectTimeoutMS=60000".to_string());
+                options.push("serverSelectionTimeoutMS=60000".to_string());
+                options.push("socketTimeoutMS=60000".to_string());
+                
+                uri.push_str(&format!("?{}", options.join("&")));
+                
+                println!("[VELOCITY] Testing MongoDB: {}:{}/{}", host, port, database);
                 
                 let client_options = mongodb::options::ClientOptions::parse(&uri)
                     .await
-                    .map_err(|e| VelocityError::Connection(e.to_string()))?;
+                    .map_err(|e| VelocityError::Connection(format!("MongoDB parse error: {}", e)))?;
                 
                 let client = mongodb::Client::with_options(client_options)
-                    .map_err(|e| VelocityError::Connection(e.to_string()))?;
+                    .map_err(|e| VelocityError::Connection(format!("MongoDB client error: {}", e)))?;
                 
                 // Ping the database to test connection
                 let db = client.database(database);
                 db.run_command(mongodb::bson::doc! { "ping": 1 })
                     .await
-                    .map_err(|e| VelocityError::Connection(e.to_string()))?;
+                    .map_err(|e| VelocityError::Connection(format!("MongoDB ping error: {}", e)))?;
                 
                 Ok(())
             }

@@ -31,7 +31,7 @@ import { toast } from "sonner";
 
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  dbType: z.enum(["SQLite", "PostgreSQL", "MySQL", "MariaDB", "CockroachDB", "Redshift", "SQLServer", "Redis"]),
+  dbType: z.enum(["SQLite", "PostgreSQL", "MySQL", "MariaDB", "CockroachDB", "Redshift", "SQLServer", "Redis", "MongoDB"]),
   host: z.string().optional(),
   port: z.string().optional(),
   database: z.string().optional(),
@@ -46,6 +46,8 @@ const formSchema = z.object({
   trustServerCertificate: z.boolean().default(true),
   // Redis specific
   useTls: z.boolean().default(false),
+  // MongoDB specific
+  authSource: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -63,10 +65,12 @@ function parseConnectionUrl(url: string): Partial<FormValues> | null {
     // postgresql://user:password@host:port/database
     // redis://user:password@host:port/0
     // rediss://... (TLS)
-    const match = url.match(/^(rediss?|postgresql|postgres|mysql|mariadb|cockroachdb|redshift):\/\/(?:([^:@]+)(?::([^@]*))?@)?([^:\/]+)(?::(\d+))?(?:\/(.*))?$/);
+    // mongodb://user:password@host:port/database
+    const match = url.match(/^(mongodb|rediss?|postgresql|postgres|mysql|mariadb|cockroachdb|redshift):\/\/(?:([^:@]+)(?::([^@]*))?@)?([^:\/?]+)(?::(\d+))?(?:\/([^?]*))?(?:\?(.*))?$/);
     if (match) {
-      const [, protocol, user, pass, host, port, database] = match;
+      const [, protocol, user, pass, host, port, database, queryString] = match;
       const isRedis = protocol.toLowerCase().startsWith('redis');
+      const isMongo = protocol.toLowerCase() === 'mongodb';
       const isTls = protocol.toLowerCase() === 'rediss';
       
       const dbTypeMap: Record<string, DatabaseType> = {
@@ -79,6 +83,7 @@ function parseConnectionUrl(url: string): Partial<FormValues> | null {
         redshift: "Redshift",
         redis: "Redis",
         rediss: "Redis",
+        mongodb: "MongoDB",
       };
       
       const defaultPorts: Record<string, string> = {
@@ -88,17 +93,26 @@ function parseConnectionUrl(url: string): Partial<FormValues> | null {
         mariadb: "3306",
         redis: "6379",
         rediss: "6379",
+        mongodb: "27017",
       };
+      
+      // Parse query string for authSource
+      let authSource = "";
+      if (queryString) {
+        const params = new URLSearchParams(queryString);
+        authSource = params.get("authSource") || "";
+      }
       
       return {
         dbType: dbTypeMap[protocol.toLowerCase()] || "PostgreSQL",
         username: user || "",
-        password: pass || "",
+        password: pass ? decodeURIComponent(pass) : "",
         host: host || "localhost",
         port: port || defaultPorts[protocol.toLowerCase()] || "5432",
         database: isRedis ? (database || "0") : (database || ""),
-        useTls: isTls,
-        ssl: !isRedis && (protocol.endsWith('s') || false),
+        useTls: isTls || (isMongo && queryString?.includes("tls=true")),
+        ssl: !isRedis && !isMongo && (protocol.endsWith('s') || false),
+        authSource: authSource,
       };
     }
   } catch {
@@ -207,6 +221,15 @@ export function ConnectionForm({ connection, onSuccess, onCancel }: ConnectionFo
         config.password = values.password?.trim() || undefined;
         config.database = parseInt(values.database || "0", 10); // Redis DB index as number
         config.useTls = values.useTls;
+      } else if (values.dbType === "MongoDB") {
+        // MongoDB specific config
+        config.host = values.host;
+        config.port = parseInt(values.port || "27017", 10);
+        config.database = values.database || "test";
+        config.username = values.username || undefined;
+        config.password = values.password?.trim() || undefined;
+        config.useTls = values.useTls || false;
+        config.authSource = values.authSource || undefined;
       } else {
         config.host = values.host;
         config.port = parseInt(values.port || "5432", 10);
@@ -321,6 +344,7 @@ export function ConnectionForm({ connection, onSuccess, onCancel }: ConnectionFo
                       <SelectItem value="Redshift">Redshift</SelectItem>
                       <SelectItem value="SQLServer">SQL Server</SelectItem>
                       <SelectItem value="Redis">Redis</SelectItem>
+                      <SelectItem value="MongoDB">MongoDB</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -447,23 +471,67 @@ export function ConnectionForm({ connection, onSuccess, onCancel }: ConnectionFo
                   />
                 </div>
                 
-                <FormField
-                  control={form.control as any}
-                  name="ssl"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border border-border p-4 bg-secondary/50">
-                      <FormControl>
-                        <Checkbox
-                          checked={!!field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel>Enable SSL</FormLabel>
-                      </div>
-                    </FormItem>
-                  )}
-                />
+                {/* MongoDB specific fields */}
+                {dbType === "MongoDB" && (
+                  <>
+                    <FormField
+                      control={form.control as any}
+                      name="authSource"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Auth Source (optional)</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="admin" 
+                              {...field} 
+                              value={field.value || ''} 
+                              className="bg-secondary border-border"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control as any}
+                      name="useTls"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border border-border p-4 bg-secondary/50">
+                          <FormControl>
+                            <Checkbox
+                              checked={!!field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel>Enable TLS</FormLabel>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                  </>
+                )}
+
+                {/* SSL for SQL databases (not Redis, not MongoDB, not SQLite) */}
+                {dbType !== "Redis" && dbType !== "MongoDB" && (
+                  <FormField
+                    control={form.control as any}
+                    name="ssl"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border border-border p-4 bg-secondary/50">
+                        <FormControl>
+                          <Checkbox
+                            checked={!!field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>Enable SSL</FormLabel>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+                )}
               </>
             )}
           </TabsContent>
@@ -490,6 +558,15 @@ export function ConnectionForm({ connection, onSuccess, onCancel }: ConnectionFo
                   config.password = values.password?.trim() || undefined;
                   config.database = parseInt(values.database || "0", 10);
                   config.useTls = values.useTls;
+                } else if (values.dbType === "MongoDB") {
+                  // MongoDB specific config
+                  config.host = values.host;
+                  config.port = parseInt(values.port || "27017", 10);
+                  config.database = values.database || "test";
+                  config.username = values.username || undefined;
+                  config.password = values.password?.trim() || undefined;
+                  config.useTls = values.useTls || false;
+                  config.authSource = values.authSource || undefined;
                 } else {
                   config.host = values.host;
                   config.port = parseInt(values.port || "5432", 10);

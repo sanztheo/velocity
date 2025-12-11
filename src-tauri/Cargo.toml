@@ -48,3 +48,5 @@ rust_xlsxwriter = "0.92"
 tauri-plugin-dialog = "2"
 # For MongoDB BSON
 futures = "0.3"
+# URL encoding for credentials
+urlencoding = "2"
