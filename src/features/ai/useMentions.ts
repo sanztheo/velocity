@@ -44,7 +44,7 @@ export function useMentions({ connectionId }: UseMentionsOptions): UseMentionsRe
     
     setIsLoadingTables(true);
     try {
-      const tables = await invoke<string[]>('list_tables', { connectionId });
+      const tables = await invoke<string[]>('list_tables', { id: connectionId });
       setAvailableTables(tables || []);
     } catch (e) {
       console.error('[useMentions] Failed to fetch tables:', e);

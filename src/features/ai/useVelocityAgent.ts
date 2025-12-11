@@ -141,7 +141,7 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
     }
   }, [connectionId]);
 
-  // Send message and stream response
+  // Send message and stream response with agentic loop
   const append = useCallback(async (
     message: { role: 'user'; content: string },
     mentions: Mention[] = [],
@@ -181,6 +181,7 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
       
       // Get model based on mode and provider from config
       const model = modeConfig.models[provider];
+      const maxSteps = modeConfig.maxSteps || 5;
 
       // Build context from mentioned tables
       let contextPrefix = '';
@@ -188,7 +189,7 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
       if (tableMentions.length > 0) {
         const schemaPromises = tableMentions.map(async (m) => {
           try {
-            const schema = await invoke('get_table_schema', { connectionId, tableName: m.value });
+            const schema = await invoke('get_table_schema', { id: connectionId, tableName: m.value });
             return `## Table: ${m.value}\n\`\`\`json\n${JSON.stringify(schema, null, 2)}\n\`\`\``;
           } catch {
             return `## Table: ${m.value}\n(Failed to load schema)`;
@@ -198,8 +199,16 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
         contextPrefix = `<context>\nThe user mentioned these tables. Here is their schema:\n${schemas.join('\n\n')}\n</context>\n\n`;
       }
 
-      // Build messages for API
-      const apiMessages = messages
+      // Build initial messages for API
+      // Type for API messages that can include tool calls
+      type ApiMessage = {
+        role: string;
+        content: string;
+        toolCalls?: { id: string; callType: string; function: { name: string; arguments: string } }[];
+        toolCallId?: string;
+      };
+      
+      const apiMessages: ApiMessage[] = messages
         .filter(m => m.role !== 'system')
         .map(m => ({
           role: m.role,
@@ -208,199 +217,43 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
       // Add user message with context prefix
       apiMessages.push({ role: 'user', content: contextPrefix + message.content });
 
-      // Create channel for streaming
-      const channel = new Channel<AiChatChunk>();
+      // ===== AGENTIC LOOP =====
+      // Continue until no tool calls or maxSteps reached
+      let step = 0;
+      let continueLoop = true;
 
-      channel.onmessage = (chunk: AiChatChunk) => {
-        console.log('[AI Chunk]', chunk);
-
-        if (chunk.type === 'toolCall') {
-          // Accumulate tool calls for later execution
-          pendingToolCallsRef.current.push({
-            id: chunk.id || `tool-${Date.now()}`,
-            name: chunk.name || 'unknown',
-            args: chunk.arguments ? JSON.parse(chunk.arguments) : {},
-          });
-        }
-
-        setMessages(prev => {
-          const updated = [...prev];
-          const lastIdx = updated.length - 1;
-          if (lastIdx < 0) return prev;
-          
-          const lastMsg = { ...updated[lastIdx] };
-          const parts = [...(lastMsg.parts || [])];
-
-          switch (chunk.type) {
-            case 'textDelta': {
-              const textPartIdx = parts.findIndex(p => p.type === 'text');
-              if (textPartIdx >= 0) {
-                const existingText = parts[textPartIdx].text || '';
-                const newText = existingText + (chunk.text || '');
-                parts[textPartIdx] = { ...parts[textPartIdx], text: newText };
-                lastMsg.content = newText;
-              } else {
-                const newText = chunk.text || '';
-                parts.push({ type: 'text', text: newText });
-                lastMsg.content = newText;
-              }
-              break;
-            }
-
-            case 'reasoning': {
-              const reasoningIdx = parts.findIndex(p => p.type === 'reasoning');
-              if (reasoningIdx >= 0) {
-                const existingReasoning = parts[reasoningIdx].text || parts[reasoningIdx].content || '';
-                const newReasoning = existingReasoning + (chunk.text || '');
-                parts[reasoningIdx] = { ...parts[reasoningIdx], text: newReasoning, content: newReasoning };
-              } else {
-                const newReasoning = chunk.text || '';
-                parts.unshift({ type: 'reasoning', text: newReasoning, content: newReasoning });
-              }
-              break;
-            }
-
-            case 'toolCall':
-              parts.push({
-                type: 'tool-invocation',
-                toolName: chunk.name,
-                toolCallId: chunk.id,
-                args: chunk.arguments ? JSON.parse(chunk.arguments) : {},
-                status: 'pending',
-              });
-              break;
-
-            case 'done':
-              // Will be handled after the invoke completes
-              break;
-
-            case 'error':
-              setError(new Error(chunk.message || 'Unknown error'));
-              setIsLoading(false);
-              break;
-          }
-
-          lastMsg.parts = parts;
-          updated[lastIdx] = lastMsg;
-          return updated;
-        });
-      };
-
-      // Invoke Tauri command
-      await invoke('ai_chat_stream', {
-        request: {
-          messages: apiMessages,
-          model,
-          provider,
-          systemPrompt: modeConfig.systemPrompt,
-          maxTokens: modeConfig.maxTokens,
-          temperature: modeConfig.temperature,
-          enableWebSearch,
-        },
-        onEvent: channel,
-      });
-
-      // After streaming completes, execute pending tool calls
-      if (pendingToolCallsRef.current.length > 0) {
-        console.log('[Executing Tool Calls]', pendingToolCallsRef.current);
-        const toolResults: { tool_call_id: string; role: 'tool'; content: string }[] = [];
-        const toolCallsCopy = [...pendingToolCallsRef.current]; // Copy before clearing
+      while (continueLoop && step < maxSteps) {
+        step++;
+        console.log(`[Agent Step ${step}/${maxSteps}]`);
         
-        for (const toolCall of pendingToolCallsRef.current) {
-          // Update status to executing
-          setMessages(prev => {
-            const updated = [...prev];
-            const lastIdx = updated.length - 1;
-            if (lastIdx < 0) return prev;
-            
-            const lastMsg = { ...updated[lastIdx] };
-            const parts = [...(lastMsg.parts || [])];
-            const toolPartIdx = parts.findIndex(p => p.type === 'tool-invocation' && p.toolCallId === toolCall.id);
-            if (toolPartIdx >= 0) {
-              parts[toolPartIdx] = { ...parts[toolPartIdx], status: 'executing' };
-            }
-            lastMsg.parts = parts;
-            updated[lastIdx] = lastMsg;
-            return updated;
-          });
-
-          // Execute the tool
-          const result = await executeTool(toolCall.name, toolCall.args);
-          toolResults.push({
-            tool_call_id: toolCall.id,
-            role: 'tool' as const,
-            content: JSON.stringify(result),
-          });
-          
-          // Update with result
-          setMessages(prev => {
-            const updated = [...prev];
-            const lastIdx = updated.length - 1;
-            if (lastIdx < 0) return prev;
-            
-            const lastMsg = { ...updated[lastIdx] };
-            const parts = [...(lastMsg.parts || [])];
-            const toolPartIdx = parts.findIndex(p => p.type === 'tool-invocation' && p.toolCallId === toolCall.id);
-            if (toolPartIdx >= 0) {
-              parts[toolPartIdx] = { 
-                ...parts[toolPartIdx], 
-                status: 'success',
-                result,
-              };
-            }
-            lastMsg.parts = parts;
-            updated[lastIdx] = lastMsg;
-            return updated;
-          });
-        }
-        
+        // Reset pending tool calls for this step
         pendingToolCallsRef.current = [];
 
-        // Send tool results back to AI for final response
-        if (toolResults.length > 0) {
-          console.log('[Multi-step] Sending Tool Results to AI');
-          console.log('[Multi-step] Tool Calls:', toolCallsCopy);
-          console.log('[Multi-step] Tool Results:', toolResults);
-          
-          // Build complete message history with tool results
-          // Format must match OpenAI/Grok API expectations
-          const followUpMessages = [
-            ...apiMessages,
-            {
-              role: 'assistant',
-              content: '', // Will be converted to null in Rust
-              // toolCalls in camelCase for Rust serde
-              toolCalls: toolCallsCopy.map(tc => ({
-                id: tc.id,
-                callType: 'function',
-                function: { name: tc.name, arguments: JSON.stringify(tc.args) }
-              }))
-            },
-            // Tool result messages - one per tool call
-            ...toolResults.map(tr => ({
-              role: 'tool',
-              content: tr.content,
-              toolCallId: tr.tool_call_id
-            }))
-          ];
+        // Create channel for streaming
+        const channel = new Channel<AiChatChunk>();
 
-          console.log('[Multi-step] Follow-up messages:', followUpMessages);
+        channel.onmessage = (chunk: AiChatChunk) => {
+          console.log(`[Step ${step}] Chunk:`, chunk);
 
-          // Create new channel for follow-up response
-          const followUpChannel = new Channel<AiChatChunk>();
-          
-          followUpChannel.onmessage = (chunk: AiChatChunk) => {
-            console.log('[AI Follow-up Chunk]', chunk);
+          if (chunk.type === 'toolCall') {
+            // Accumulate tool calls for later execution
+            pendingToolCallsRef.current.push({
+              id: chunk.id || `tool-${Date.now()}`,
+              name: chunk.name || 'unknown',
+              args: chunk.arguments ? JSON.parse(chunk.arguments) : {},
+            });
+          }
 
-            if (chunk.type === 'textDelta') {
-              setMessages(prev => {
-                const updated = [...prev];
-                const lastIdx = updated.length - 1;
-                if (lastIdx < 0) return prev;
-                
-                const lastMsg = { ...updated[lastIdx] };
-                const parts = [...(lastMsg.parts || [])];
-                
+          setMessages(prev => {
+            const updated = [...prev];
+            const lastIdx = updated.length - 1;
+            if (lastIdx < 0) return prev;
+            
+            const lastMsg = { ...updated[lastIdx] };
+            const parts = [...(lastMsg.parts || [])];
+
+            switch (chunk.type) {
+              case 'textDelta': {
                 const textPartIdx = parts.findIndex(p => p.type === 'text');
                 if (textPartIdx >= 0) {
                   const existingText = parts[textPartIdx].text || '';
@@ -412,39 +265,143 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
                   parts.push({ type: 'text', text: newText });
                   lastMsg.content = newText;
                 }
+                break;
+              }
 
-                lastMsg.parts = parts;
-                updated[lastIdx] = lastMsg;
-                return updated;
-              });
-            }
-            
-            if (chunk.type === 'error') {
-              console.error('[Multi-step Error]', chunk.message);
-              setError(new Error(chunk.message || 'Follow-up failed'));
-            }
-          };
+              case 'reasoning': {
+                const reasoningIdx = parts.findIndex(p => p.type === 'reasoning');
+                if (reasoningIdx >= 0) {
+                  const existingReasoning = parts[reasoningIdx].text || parts[reasoningIdx].content || '';
+                  const newReasoning = existingReasoning + (chunk.text || '');
+                  parts[reasoningIdx] = { ...parts[reasoningIdx], text: newReasoning, content: newReasoning };
+                } else {
+                  const newReasoning = chunk.text || '';
+                  parts.unshift({ type: 'reasoning', text: newReasoning, content: newReasoning });
+                }
+                break;
+              }
 
-          // Invoke Tauri command for follow-up
-          console.log('[Multi-step] Invoking ai_chat_stream for follow-up...');
-          try {
-            await invoke('ai_chat_stream', {
-              request: {
-                messages: followUpMessages,
-                model,
-                provider,
-                systemPrompt: modeConfig.systemPrompt,
-                maxTokens: modeConfig.maxTokens,
-                temperature: modeConfig.temperature,
-              },
-              onEvent: followUpChannel,
+              case 'toolCall':
+                parts.push({
+                  type: 'tool-invocation',
+                  toolName: chunk.name,
+                  toolCallId: chunk.id,
+                  args: chunk.arguments ? JSON.parse(chunk.arguments) : {},
+                  status: 'pending',
+                });
+                break;
+
+              case 'error':
+                setError(new Error(chunk.message || 'Unknown error'));
+                setIsLoading(false);
+                break;
+            }
+
+            lastMsg.parts = parts;
+            updated[lastIdx] = lastMsg;
+            return updated;
+          });
+        };
+
+        // Invoke Tauri command
+        await invoke('ai_chat_stream', {
+          request: {
+            messages: apiMessages,
+            model,
+            provider,
+            systemPrompt: modeConfig.systemPrompt,
+            maxTokens: modeConfig.maxTokens,
+            temperature: modeConfig.temperature,
+            enableWebSearch: step === 1 ? enableWebSearch : false, // Only enable web search on first step
+          },
+          onEvent: channel,
+        });
+
+        // Check if we have tool calls to execute
+        if (pendingToolCallsRef.current.length === 0) {
+          // No tool calls, we're done!
+          console.log(`[Step ${step}] No tool calls, ending loop`);
+          continueLoop = false;
+        } else {
+          // Execute tool calls and prepare for next iteration
+          console.log(`[Step ${step}] Executing ${pendingToolCallsRef.current.length} tool calls`);
+          const toolCallsCopy = [...pendingToolCallsRef.current];
+          const toolResults: { tool_call_id: string; role: 'tool'; content: string }[] = [];
+
+          for (const toolCall of toolCallsCopy) {
+            // Update status to executing
+            setMessages(prev => {
+              const updated = [...prev];
+              const lastIdx = updated.length - 1;
+              if (lastIdx < 0) return prev;
+              
+              const lastMsg = { ...updated[lastIdx] };
+              const parts = [...(lastMsg.parts || [])];
+              const toolPartIdx = parts.findIndex(p => p.type === 'tool-invocation' && p.toolCallId === toolCall.id);
+              if (toolPartIdx >= 0) {
+                parts[toolPartIdx] = { ...parts[toolPartIdx], status: 'executing' };
+              }
+              lastMsg.parts = parts;
+              updated[lastIdx] = lastMsg;
+              return updated;
             });
-            console.log('[Multi-step] Follow-up completed');
-          } catch (followUpError) {
-            console.error('[Multi-step] Follow-up invoke error:', followUpError);
-            setError(followUpError instanceof Error ? followUpError : new Error(String(followUpError)));
+
+            // Execute the tool
+            const result = await executeTool(toolCall.name, toolCall.args);
+            toolResults.push({
+              tool_call_id: toolCall.id,
+              role: 'tool' as const,
+              content: JSON.stringify(result),
+            });
+            
+            // Update with result
+            setMessages(prev => {
+              const updated = [...prev];
+              const lastIdx = updated.length - 1;
+              if (lastIdx < 0) return prev;
+              
+              const lastMsg = { ...updated[lastIdx] };
+              const parts = [...(lastMsg.parts || [])];
+              const toolPartIdx = parts.findIndex(p => p.type === 'tool-invocation' && p.toolCallId === toolCall.id);
+              if (toolPartIdx >= 0) {
+                parts[toolPartIdx] = { 
+                  ...parts[toolPartIdx], 
+                  status: 'success',
+                  result,
+                };
+              }
+              lastMsg.parts = parts;
+              updated[lastIdx] = lastMsg;
+              return updated;
+            });
           }
+
+          // Add assistant message with tool calls to history
+          apiMessages.push({
+            role: 'assistant',
+            content: '',
+            toolCalls: toolCallsCopy.map(tc => ({
+              id: tc.id,
+              callType: 'function',
+              function: { name: tc.name, arguments: JSON.stringify(tc.args) }
+            }))
+          });
+
+          // Add tool results to history
+          for (const tr of toolResults) {
+            apiMessages.push({
+              role: 'tool',
+              content: tr.content,
+              toolCallId: tr.tool_call_id
+            });
+          }
+
+          console.log(`[Step ${step}] Added results to history, continuing loop...`);
         }
+      }
+
+      if (step >= maxSteps) {
+        console.log(`[Agent] Reached maxSteps (${maxSteps}), stopping`);
       }
       
       setIsLoading(false);
@@ -454,7 +411,7 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
       setError(e instanceof Error ? e : new Error(String(e)));
       setIsLoading(false);
     }
-  }, [messages, settings, mode, executeTool]);
+  }, [messages, settings, mode, executeTool, connectionId]);
 
   // Reload last message
   const reload = useCallback(async () => {

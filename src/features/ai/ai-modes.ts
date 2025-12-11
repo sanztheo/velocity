@@ -99,7 +99,7 @@ export const AI_MODE_CONFIGS: Record<AgentModeKey, AIModeConfig> = {
     },
     temperature: 0.7,
     maxTokens: 4096,
-    maxSteps: 1, // Single step - quick response
+    maxSteps: 10, // Like Cursor's default
     systemPrompt: FAST_SYSTEM_PROMPT,
   },
   deep: {
@@ -110,7 +110,7 @@ export const AI_MODE_CONFIGS: Record<AgentModeKey, AIModeConfig> = {
     },
     temperature: 0.3, // More deterministic
     maxTokens: 8192, // Longer responses
-    maxSteps: 5, // Multi-step for complex tasks
+    maxSteps: 25, // High autonomy for complex tasks
     systemPrompt: DEEP_SYSTEM_PROMPT,
   },
 };
