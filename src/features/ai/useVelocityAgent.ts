@@ -104,7 +104,7 @@ After completing operations, confirm what was created.
 - When presenting a plan, use numbered lists for clarity.
 </formatting>`;
 
-export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions): UseVelocityAgentReturn {
+export function useVelocityAgent({ connectionId: _connectionId, mode }: UseVelocityAgentOptions): UseVelocityAgentReturn {
   const settings = useAISettingsStore();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -188,10 +188,6 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
 
       // Create channel for streaming
       const channel = new Channel<AiChatChunk>();
-      
-      // Track current text and reasoning for accumulation
-      let currentText = '';
-      let currentReasoning = '';
 
       channel.onmessage = (chunk: AiChatChunk) => {
         console.log('[AI Chunk]', chunk);
@@ -199,32 +195,41 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
         setMessages(prev => {
           const updated = [...prev];
           const lastIdx = updated.length - 1;
+          if (lastIdx < 0) return prev;
+          
           const lastMsg = { ...updated[lastIdx] };
           const parts = [...(lastMsg.parts || [])];
 
           switch (chunk.type) {
-            case 'textDelta':
-              currentText += chunk.text || '';
-              // Find or create text part
+            case 'textDelta': {
+              // Find existing text part and append to it
               const textPartIdx = parts.findIndex(p => p.type === 'text');
               if (textPartIdx >= 0) {
-                parts[textPartIdx] = { ...parts[textPartIdx], text: currentText };
+                const existingText = parts[textPartIdx].text || '';
+                const newText = existingText + (chunk.text || '');
+                parts[textPartIdx] = { ...parts[textPartIdx], text: newText };
+                lastMsg.content = newText;
               } else {
-                parts.push({ type: 'text', text: currentText });
+                const newText = chunk.text || '';
+                parts.push({ type: 'text', text: newText });
+                lastMsg.content = newText;
               }
-              lastMsg.content = currentText;
               break;
+            }
 
-            case 'reasoning':
-              currentReasoning += chunk.text || '';
-              // Find or create reasoning part at beginning
+            case 'reasoning': {
+              // Find existing reasoning part and append to it
               const reasoningIdx = parts.findIndex(p => p.type === 'reasoning');
               if (reasoningIdx >= 0) {
-                parts[reasoningIdx] = { ...parts[reasoningIdx], text: currentReasoning, content: currentReasoning };
+                const existingReasoning = parts[reasoningIdx].text || parts[reasoningIdx].content || '';
+                const newReasoning = existingReasoning + (chunk.text || '');
+                parts[reasoningIdx] = { ...parts[reasoningIdx], text: newReasoning, content: newReasoning };
               } else {
-                parts.unshift({ type: 'reasoning', text: currentReasoning, content: currentReasoning });
+                const newReasoning = chunk.text || '';
+                parts.unshift({ type: 'reasoning', text: newReasoning, content: newReasoning });
               }
               break;
+            }
 
             case 'toolCall':
               parts.push({
@@ -275,7 +280,6 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
   // Reload last message
   const reload = useCallback(async () => {
     if (messages.length < 2) return;
-    // Remove last assistant message and resend
     const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
     if (lastUserMsg) {
       setMessages(prev => prev.slice(0, -1));
@@ -293,7 +297,6 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
   const confirmSql = useCallback(async () => {
     if (!pendingConfirmation) return;
     setPendingConfirmation(null);
-    // Execute would happen here
   }, [pendingConfirmation]);
 
   // Reject SQL
