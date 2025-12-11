@@ -40,6 +40,16 @@ export function MessageBubble({ message }: MessageBubbleProps) {
       {/* Message Content - Interleaved Parts */}
       {parts.length > 0 ? (
         parts.map((part, i) => {
+          // Thinking Loading State
+          if (part.type === 'thinking') {
+            return (
+              <div key={`thinking-${i}`} className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
+                <span>Thinking...</span>
+              </div>
+            );
+          }
+
           // Reasoning Block
           if (part.type === 'reasoning') {
             return (
@@ -81,14 +91,14 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             return (
               isUser ? (
                 <div key={`text-${i}`} className="group mt-1 flex w-full flex-row items-start gap-2">
-                  <div className="relative flex grow flex-col items-stretch">
-                    <div className="grow rounded-lg border border-border/10 bg-muted/20 p-2">
-                      <div className="prose prose-sm dark:prose-invert max-w-none [&>*:not(pre):not(code)]:text-[0.813rem]">
+                  <div className="relative flex grow flex-col items-stretch min-w-0">
+                    <div className="grow rounded-lg border border-border/10 bg-muted/20 p-2 break-words">
+                      <div className="prose prose-sm dark:prose-invert max-w-none break-words whitespace-pre-wrap [&>*:not(pre):not(code)]:text-[0.813rem]">
                         <ReactMarkdown
                           remarkPlugins={[remarkGfm]}
                           components={{
                             pre: ({ children }) => (
-                              <pre className="bg-muted rounded-md p-3 overflow-x-auto my-2">
+                              <pre className="bg-muted rounded-md p-3 overflow-x-auto my-2 whitespace-pre-wrap break-all">
                                 {children}
                               </pre>
                             ),
@@ -96,7 +106,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                               const isInline = !className;
                               if (isInline) {
                                 return (
-                                  <code className="bg-muted px-1 py-0.5 rounded text-sm" {...props}>
+                                  <code className="bg-muted px-1 py-0.5 rounded text-sm break-all" {...props}>
                                     {children}
                                   </code>
                                 );
@@ -112,12 +122,12 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                   </div>
                 </div>
               ) : (
-                <div key={`text-${i}`} className="prose prose-sm dark:prose-invert max-w-none [&>*:not(pre):not(code)]:text-[0.813rem] mb-2">
+                <div key={`text-${i}`} className="prose prose-sm dark:prose-invert max-w-none break-words whitespace-pre-wrap [&>*:not(pre):not(code)]:text-[0.813rem] mb-2 min-w-0">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
                     components={{
                       pre: ({ children }) => (
-                        <pre className="bg-muted rounded-md p-3 overflow-x-auto my-2">
+                        <pre className="bg-muted rounded-md p-3 overflow-x-auto my-2 whitespace-pre-wrap break-all">
                           {children}
                         </pre>
                       ),
@@ -125,7 +135,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                         const isInline = !className;
                         if (isInline) {
                           return (
-                            <code className="bg-muted px-1 py-0.5 rounded text-sm" {...props}>
+                            <code className="bg-muted px-1 py-0.5 rounded text-sm break-all" {...props}>
                               {children}
                             </code>
                           );
@@ -133,7 +143,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                         return <code className={className} {...props}>{children}</code>;
                       },
                       table: ({ children }) => (
-                        <div className="overflow-x-auto my-2">
+                        <div className="overflow-x-auto my-2 block">
                           <table className="min-w-full border-collapse border border-border">
                             {children}
                           </table>
@@ -165,16 +175,16 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         message.content && (
           isUser ? (
              <div className="group mt-1 flex w-full flex-row items-start gap-2">
-              <div className="relative flex grow flex-col items-stretch">
-                <div className="grow rounded-lg border border-border/10 bg-muted/20 p-2">
-                  <div className="prose prose-sm dark:prose-invert max-w-none [&>*:not(pre):not(code)]:text-[0.813rem]">
+              <div className="relative flex grow flex-col items-stretch min-w-0">
+                <div className="grow rounded-lg border border-border/10 bg-muted/20 p-2 break-words">
+                  <div className="prose prose-sm dark:prose-invert max-w-none break-words whitespace-pre-wrap [&>*:not(pre):not(code)]:text-[0.813rem]">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
                   </div>
                 </div>
               </div>
             </div>
           ) : (
-            <div className="prose prose-sm dark:prose-invert max-w-none [&>*:not(pre):not(code)]:text-[0.813rem]">
+            <div className="prose prose-sm dark:prose-invert max-w-none break-words whitespace-pre-wrap [&>*:not(pre):not(code)]:text-[0.813rem] min-w-0">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
             </div>
           )

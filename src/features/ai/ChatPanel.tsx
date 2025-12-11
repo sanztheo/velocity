@@ -81,13 +81,15 @@ export function ChatPanel({ connectionId }: ChatPanelProps) {
           ))
         )}
         
-        {/* Loading indicator */}
+        {/* Loading indicator (Removed to avoid duplication with MessageBubble) */}
+        {/*
         {agent.isLoading && !agent.pendingConfirmation && (
           <div className="px-4 py-3 text-sm text-muted-foreground flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
             Thinking...
           </div>
         )}
+        */}
 
         {/* Error display */}
         {agent.error && (

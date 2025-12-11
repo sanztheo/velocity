@@ -32,7 +32,7 @@ export interface ChatMessage {
 }
 
 interface MessagePart {
-  type: 'text' | 'reasoning' | 'tool-invocation';
+  type: 'text' | 'reasoning' | 'tool-invocation' | 'thinking';
   content?: string;
   toolCallId?: string; // Added ID for dedup
   toolName?: string;
@@ -298,75 +298,104 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
       });
 
       // Track executed tool IDs for this single turn
-      const executedToolIds = new Set<string>();
+      // (Removed executedToolIds as we handle tools via stream)
 
       const result = streamText({
         model,
         system: SYSTEM_PROMPT,
         messages: conversationMessages,
         tools: velocityToolDefinitions,
-        onStepFinish: async (step) => {
-          // If there are tool calls, we need to handle them
-          if (step.toolCalls && step.toolCalls.length > 0) {
-             // We will handle execution AFTER the stream finishes to avoid race conditions 
-             // and allow cleaner flow control (pausing for confirmation).
-             // BUT we need to update UI to show "Executing...".
-             // The UI update logic is fine here.
-             
-             for (const toolCall of step.toolCalls) {
-               const tc = toolCall as { toolName: string; toolCallId: string; input?: Record<string, unknown>; args?: Record<string, unknown> };
-               const toolArgs = tc.input || tc.args || {};
-               const toolCallId = tc.toolCallId || `tool-${Date.now()}-${Math.random()}`;
-
-               // Minimal UI update to show "Thinking/Executing"
-               setMessages(prev => {
-                  const updated = [...prev];
-                  const lastMsg = updated[updated.length - 1];
-                  if (lastMsg.role === 'assistant') {
-                    // Dedup check
-                    const existing = lastMsg.parts?.find(p => p.toolCallId === toolCallId);
-                    if (!existing) {
-                      const toolPart: MessagePart = {
-                        type: 'tool-invocation',
-                        toolCallId,
-                        toolName: tc.toolName,
-                        args: toolArgs,
-                        status: 'executing',
-                      };
-                      lastMsg.parts = [...(lastMsg.parts || []), toolPart];
-                    }
-                  }
-                  return updated;
-               });
-             }
-          }
-        },
+        // We handle everything in fullStream loop
       });
 
-      // Stream text to UI
-      let fullText = '';
-      for await (const textPart of result.textStream) {
-        fullText += textPart;
+      // Stream parts to UI in order
+      // Add initial "thinking" state
+      setMessages(prev => {
+        const updated = [...prev];
+        const lastMsgIndex = updated.length - 1;
+        const lastMsg = { ...updated[lastMsgIndex] };
+        updated[lastMsgIndex] = lastMsg;
+        lastMsg.parts = [{ type: 'thinking', content: '' }]; // Placeholder for loading state
+        return updated;
+      });
+
+      for await (const part of result.fullStream) {
         setMessages(prev => {
           const updated = [...prev];
-          const lastMsg = updated[updated.length - 1];
-          if (lastMsg.role === 'assistant') {
-            lastMsg.content = fullText;
-            const textPart = lastMsg.parts?.find(p => p.type === 'text');
-            if (textPart) {
-              textPart.content = fullText;
-            } else {
-              // Only add text part if it has content
-              if (fullText.trim()) {
-                 lastMsg.parts = lastMsg.parts ? [{ type: 'text', content: fullText }, ...lastMsg.parts.filter(p => p.type !== 'text')] : [{ type: 'text', content: fullText }];
+          const lastMsgIndex = updated.length - 1;
+          const lastMsg = { ...updated[lastMsgIndex] }; // Clone message
+          updated[lastMsgIndex] = lastMsg;
+
+          if (!lastMsg.parts) lastMsg.parts = [];
+          
+          // Clone parts array because we might push to it or modify an item
+          const parts = [...lastMsg.parts];
+          lastMsg.parts = parts;
+          
+          // Remove placeholder "thinking" part if real content arrives (except reasoning-delta where we keep thinking until content comes)
+          if (parts.length === 1 && parts[0].type === 'thinking' && part.type !== 'reasoning-delta') {
+            parts.shift();
+          }
+          
+          const lastPartIndex = parts.length - 1;
+          const lastPart = lastPartIndex >= 0 ? { ...parts[lastPartIndex] } : null; // Clone last part to modify safely
+
+          switch (part.type) {
+            case 'text-delta': {
+              const text = (part as any).textDelta || (part as any).text || '';
+              
+              if (lastPart && lastPart.type === 'text') {
+                lastPart.content = (lastPart.content || '') + text;
+                parts[lastPartIndex] = lastPart; // Update array with modified clone
+              } else {
+                parts.push({ type: 'text', content: text });
               }
+              lastMsg.content = (lastMsg.content || '') + text;
+              break;
+            }
+
+            case 'tool-call': {
+              const toolPart: MessagePart = {
+                type: 'tool-invocation',
+                toolCallId: part.toolCallId,
+                toolName: part.toolName,
+                args: (part as any).args, 
+                status: 'executing',
+              };
+              parts.push(toolPart);
+              break;
+            }
+            
+            // extractReasoningMiddleware emits 'reasoning' type parts with 'text' property
+            // @ts-ignore - SDK types may vary
+            case 'reasoning':
+            // @ts-ignore
+            case 'reasoning-delta': {
+              // @ts-ignore
+              const reasoningText = (part as any).text || (part as any).textDelta || (part as any).content || '';
+              
+              // Remove placeholder if still there
+              if (parts.length > 0 && parts[0].type === 'thinking') {
+                parts.shift();
+              }
+              
+              // Find existing reasoning part or create new
+              const existingReasoningIndex = parts.findIndex(p => p.type === 'reasoning');
+              if (existingReasoningIndex >= 0) {
+                const existingPart = { ...parts[existingReasoningIndex] };
+                existingPart.content = (existingPart.content || '') + reasoningText;
+                parts[existingReasoningIndex] = existingPart;
+              } else {
+                parts.push({ type: 'reasoning', content: reasoningText });
+              }
+              break;
             }
           }
           return updated;
         });
       }
 
-      // Wait for full step usage
+      // Wait for full step usage items to settle
       const toolCalls = await result.toolCalls;
 
       if (toolCalls && toolCalls.length > 0) {
@@ -388,21 +417,12 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
              if (!settings.autoAcceptSql) {
                needsConfirmation = true;
                
-               // Set pending confirmation state
-               // We pause the loop here.
-               // We need to persist the 'next steps' somehow... 
-               // Actually, we just stop. The confirm action will trigger the next runAI.
-               
                setPendingConfirmation({
                  toolCallId,
                  sql: (toolArgs.sql as string) || (toolArgs.tableName ? `CREATE TABLE ${toolArgs.tableName}...` : 'DDL'),
                  isMutation: true,
                });
                
-               // We pass the "continuation" context to the confirmation state
-               // so confirmSql knows what to do next.
-               // Ideally, we'd queue these. For now, we handle one simplified confirmation.
-               // We return here to STOP the AI loop.
                setIsLoading(false);
                return; 
              }
@@ -410,6 +430,9 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
            
            // Execute immediately
            try {
+              // Mark as executing (it might be already if stream added it)
+              // But we can update status to be sure
+              
               const output = await executeTool(tc.toolName, toolArgs);
               results.push({
                  toolCallId,
@@ -449,49 +472,18 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
            }
         }
 
-        // If we executed tools, we MUST report back to the AI so it can continue
+        // FEED RESULTS BACK TO AI
         if (results.length > 0) {
-           // Create a "tool-result" logic. 
-           // In Vercel AI SDK v5, we append a new message structure?
-           // Or just append text "Tool Executed: ..." for simplicity in this custom loop?
-           
-           // Correct way: Add 'tool' role messages.
-           // However, our `ChatMessage` type splits roles simply.
-           // Let's add a system message or a pseudo-user message with the result to prompt continuation.
-           // OR, simpler: Just call runAI again with the updated context.
-           // But we need to add the result to history.
-           
-           const toolOutputMessage: ChatMessage = {
-             id: generateId(),
-             role: 'user', // "user" acting as system tool reporter, or use 'system' if supported
-             content: `Tool Output: ${JSON.stringify(results, null, 2)}`, // Providing explicit context
-             createdAt: new Date(),
-           };
-           
-           // Hidden from UI? Or shown? 
-           // Usually tool outputs are hidden or shown as part of the tool block.
-           // We already showed the block. We don't want a new bubble.
-           // We just want to feed it to the next prompt.
-           
-           // Hack: We don't add it to `messages` state (visible UI), 
-           // but we pass it to `runAI` for the *next* turn.
-           // But wait, `runAI` takes `currentMessages`.
-           
-           // Let's add it to state but mark it hidden? 
-           // Or assume the AI "knows" what it did? 
-           // No, LLMs are stateless. We MUST feed the result.
-           
-           // Let's add a 'system' message with the tool result. 
-           // We can filter 'system' messages out of the UI if needed, or show them as debug.
-           // Ideally, our `ChatMessage` supports `role: 'tool'`, but we defined only user/assistant/system.
+           // We need to construct the next message history.
+           // Append tool results as a user tool block for the AI to react to
+           const toolOutputBlock = `Tool Results for the above calls:\n${JSON.stringify(results, null, 2)}\n\n(Proceed with these results)`;
            
            const nextMessages = [
              ...currentMessages, 
-             { role: 'assistant', content: fullText } as ChatMessage, // The message we just generated
-             { role: 'user', content: `Tool Outputs:\n${JSON.stringify(results, null, 2)}\nPlease continue.` } as ChatMessage
+             { role: 'assistant', content: (await result.text) || ' ' } as ChatMessage, // Use final text
+             { role: 'user', content: toolOutputBlock } as ChatMessage
            ];
            
-           // Recursive call to continue the thought process
            await runAI(nextMessages);
         }
       }
@@ -560,61 +552,9 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
         return updated;
       });
 
-      // CONTINUE THE LOOP
-      // We need to construct history up to this point + the result
-      // This is a bit tricky since state might have changed? 
-      // We rely on `messages` ref or passed messages.
-      
-      // Simply: trigger a generic "Continue" with the result
-      const toolOutput = JSON.stringify({
-         toolCallId,
-         toolName: 'run_sql_query', // or whatever it was
-         result
-      });
-      
-      // Add result to history effectively for the AI
-      // We will restart `runAI` with current messages + tool output
-      // Note: `messages` comes from closure, might be stale? 
-      // `setMessages` uploader is safe. 
-      // We should read the latest from `messages` in a Ref if possible, 
-      // but `useCallback` dependency `messages` handles it (though it recreates the function).
-      
-      // Actually, since we updated `messages` via setMessages, `messages` in the next render will be fresh.
-      // But inside this callback?
-      // Use raw functional update? No, we need value for runAI.
-      // Let's Assume `messages` is reasonably fresh or pass a specific continuation.
-      
-      // Best bet: Append a user "system" message with the result and runAI.
-      // The `messages` state will contain the UI feedback.
-      // The `runAI` needs the context.
-      
-      // Let's just create a new hidden message or prompt "Action confirmed and executed. Result: ..."
-      
-      // For now, let's just finish the loading state. 
-      // If we want the AI to reply "Table created!", we MUST ask it.
-      
-      // Call runAI with a prompt about the success
-      // We need to pass the FULL history.
-      // Since confirmSql depends on `messages`, it should be up to date.
-      
-      // Wait, `confirmSql` changes `messages` (updating status).
-      // We need that updated state.
-      // But we can't get it immediately after setMessages.
-      
-      // Compromise: We won't re-trigger AI immediately for confirmation in this iteration 
-      // unless we refactor to use a Ref for history. 
-      // BUT users want the "Done!" message.
-      
-      // Let's try to infer it. The AI sees "Success" in the tool result? 
-      // Only if we feed it back.
-      
-      // Simpler solution for `confirmSql`:
-      // Just finish. The User sees the green checkmark.
-      // If they want to say something, they will.
-      // IF we want auto-followup:
-      // setTimeout(() => append({role: 'user', content: 'Action completed. Result: ' + JSON.stringify(result)}), 0);
-      
-      // Let's keep it simple. Resolve the pending state.
+      // CONTINUE THE LOOP - Resolving confirmation finishes the user interaction part.
+      // We don't auto-continue the thought process here unless requested.
+      // The user can now ask "What next?" or "Show me what you did".
       
     } catch (err) {
       // Handle error...
@@ -622,7 +562,7 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
       setPendingConfirmation(null);
       setIsLoading(false);
     }
-  }, [connectionId, pendingConfirmation, messages]); // Added messages dependency
+  }, [connectionId, pendingConfirmation]); // Removed messages dependency as we use functional update // Added messages dependency
 
   // Reject pending SQL - similar update
   const rejectSql = useCallback(async (reason: string) => {

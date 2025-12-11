@@ -4,6 +4,7 @@
 import { createXai } from '@ai-sdk/xai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { wrapLanguageModel, extractReasoningMiddleware } from 'ai';
 import { invoke } from '@tauri-apps/api/core';
 import type { AgentMode, AIProvider } from './types';
 
@@ -32,15 +33,27 @@ async function getSecureApiKey(provider: AIProvider): Promise<string | null> {
 /**
  * Create an AI provider based on available keys and mode
  * Priority: Grok > OpenAI > Gemini
+ * For reasoning models, we wrap with extractReasoningMiddleware to separate <think> tags
  */
 export async function createAIProviderAsync(mode: AgentMode) {
+  // Middleware for extracting reasoning from <think> tags
+  const reasoningMiddleware = extractReasoningMiddleware({
+    tagName: 'think',
+    startWithReasoning: true, // Models like Grok/Gemini start with reasoning
+  });
+
   // Try Grok first (preferred)
   const grokKey = await getSecureApiKey('grok');
   if (grokKey) {
     const xai = createXai({ apiKey: grokKey });
-    return mode === 'deep'
-      ? xai('grok-4-1-fast-reasoning')
-      : xai('grok-4-1-fast-non-reasoning');
+    if (mode === 'deep') {
+      // Wrap reasoning model with middleware
+      return wrapLanguageModel({
+        model: xai('grok-4-1-fast-reasoning'),
+        middleware: reasoningMiddleware,
+      });
+    }
+    return xai('grok-4-1-fast-non-reasoning');
   }
 
   // Fallback to OpenAI
@@ -56,9 +69,14 @@ export async function createAIProviderAsync(mode: AgentMode) {
   const geminiKey = await getSecureApiKey('gemini');
   if (geminiKey) {
     const google = createGoogleGenerativeAI({ apiKey: geminiKey });
-    return mode === 'deep'
-      ? google('gemini-2.0-flash-thinking-exp')
-      : google('gemini-2.0-flash');
+    if (mode === 'deep') {
+      // Wrap reasoning model with middleware
+      return wrapLanguageModel({
+        model: google('gemini-2.0-flash-thinking-exp'),
+        middleware: reasoningMiddleware,
+      });
+    }
+    return google('gemini-2.0-flash');
   }
 
   throw new Error('No API key configured. Please add a Grok, OpenAI, or Gemini API key in your .env file.');
