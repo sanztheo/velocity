@@ -240,14 +240,14 @@ pub struct SafeQueryResult {
 }
 
 /// Execute SQL safely with LLM-friendly error messages
-/// This command never errors - it returns structured results including failures
+/// This command never errors at the Tauri level - it returns structured results including failures
 #[tauri::command]
 pub async fn execute_sql_safe(
     connection_id: String,
     sql: String,
     pool_manager: State<'_, Arc<ConnectionPoolManager>>,
-) -> SafeQueryResult {
-    match pool_manager.execute_query(&connection_id, &sql).await {
+) -> Result<SafeQueryResult, VelocityError> {
+    Ok(match pool_manager.execute_query(&connection_id, &sql).await {
         Ok(result) => SafeQueryResult {
             success: true,
             columns: Some(result.columns),
@@ -268,7 +268,7 @@ pub async fn execute_sql_safe(
                 error_hint: hint,
             }
         }
-    }
+    })
 }
 
 /// Generate helpful hints for common SQL errors
