@@ -358,29 +358,33 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
 
         // Send tool results back to AI for final response
         if (toolResults.length > 0) {
-          console.log('[Sending Tool Results to AI]', toolResults);
+          console.log('[Multi-step] Sending Tool Results to AI');
+          console.log('[Multi-step] Tool Calls:', toolCallsCopy);
+          console.log('[Multi-step] Tool Results:', toolResults);
           
           // Build complete message history with tool results
-          // Format must match Rust ChatMessage struct (camelCase)
+          // Format must match OpenAI/Grok API expectations
           const followUpMessages = [
             ...apiMessages,
             {
               role: 'assistant',
-              content: '',
+              content: '', // Will be converted to null in Rust
               // toolCalls in camelCase for Rust serde
               toolCalls: toolCallsCopy.map(tc => ({
                 id: tc.id,
-                callType: 'function', // callType instead of type for Rust
+                callType: 'function',
                 function: { name: tc.name, arguments: JSON.stringify(tc.args) }
               }))
             },
-            // Tool result messages
+            // Tool result messages - one per tool call
             ...toolResults.map(tr => ({
               role: 'tool',
               content: tr.content,
-              toolCallId: tr.tool_call_id // camelCase for Rust
+              toolCallId: tr.tool_call_id
             }))
           ];
+
+          console.log('[Multi-step] Follow-up messages:', followUpMessages);
 
           // Create new channel for follow-up response
           const followUpChannel = new Channel<AiChatChunk>();
@@ -414,20 +418,32 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
                 return updated;
               });
             }
+            
+            if (chunk.type === 'error') {
+              console.error('[Multi-step Error]', chunk.message);
+              setError(new Error(chunk.message || 'Follow-up failed'));
+            }
           };
 
           // Invoke Tauri command for follow-up
-          await invoke('ai_chat_stream', {
-            request: {
-              messages: followUpMessages,
-              model,
-              provider,
-              systemPrompt: modeConfig.systemPrompt,
-              maxTokens: modeConfig.maxTokens,
-              temperature: modeConfig.temperature,
-            },
-            onEvent: followUpChannel,
-          });
+          console.log('[Multi-step] Invoking ai_chat_stream for follow-up...');
+          try {
+            await invoke('ai_chat_stream', {
+              request: {
+                messages: followUpMessages,
+                model,
+                provider,
+                systemPrompt: modeConfig.systemPrompt,
+                maxTokens: modeConfig.maxTokens,
+                temperature: modeConfig.temperature,
+              },
+              onEvent: followUpChannel,
+            });
+            console.log('[Multi-step] Follow-up completed');
+          } catch (followUpError) {
+            console.error('[Multi-step] Follow-up invoke error:', followUpError);
+            setError(followUpError instanceof Error ? followUpError : new Error(String(followUpError)));
+          }
         }
       }
       
