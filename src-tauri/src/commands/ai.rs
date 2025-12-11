@@ -240,13 +240,162 @@ pub async fn ai_chat_stream(
             }).collect::<Vec<_>>()
         })
     } else {
-        // OpenAI/Grok format
+        // OpenAI/Grok format with tools
         serde_json::json!({
             "model": model,
             "messages": api_messages,
             "stream": true,
             "temperature": request.temperature.unwrap_or(0.7),
-            "max_tokens": request.max_tokens.unwrap_or(4096)
+            "max_tokens": request.max_tokens.unwrap_or(4096),
+            "tools": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "get_database_schema",
+                        "description": "Get the complete database schema including all tables, their columns with data types, views, and functions. Use this tool first to understand the database structure before writing queries.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {},
+                            "required": []
+                        }
+                    }
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "run_sql_query",
+                        "description": "Execute a SQL query against the connected database. Returns structured results with columns, rows, and row count. For SELECT queries, results are returned directly. For INSERT/UPDATE/DELETE, returns the number of affected rows.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "sql": {
+                                    "type": "string",
+                                    "description": "The SQL query to execute"
+                                }
+                            },
+                            "required": ["sql"]
+                        }
+                    }
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "list_tables",
+                        "description": "Get a list of all table names in the connected database. Faster than get_database_schema when you just need table names.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {},
+                            "required": []
+                        }
+                    }
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "get_table_schema",
+                        "description": "Get detailed schema information for a specific table. Returns columns with their data types, nullability, primary key status, and defaults.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "table_name": {
+                                    "type": "string",
+                                    "description": "The name of the table"
+                                }
+                            },
+                            "required": ["table_name"]
+                        }
+                    }
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "execute_ddl",
+                        "description": "Execute any DDL statement (CREATE, ALTER, DROP, etc.). Use this for schema modifications. ONLY one statement at a time.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "sql": {
+                                    "type": "string", 
+                                    "description": "The DDL statement to execute (CREATE, ALTER, DROP)"
+                                }
+                            },
+                            "required": ["sql"]
+                        }
+                    }
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "explain_query",
+                        "description": "Get the execution plan (EXPLAIN ANALYZE) for a SQL query to understand performance characteristics.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "sql": {
+                                    "type": "string",
+                                    "description": "The SQL query to analyze"
+                                }
+                            },
+                            "required": ["sql"]
+                        }
+                    }
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "get_table_preview",
+                        "description": "Get a preview of the data in a table (first N rows). Useful to understand the actual data format and content.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "table_name": {
+                                    "type": "string",
+                                    "description": "The name of the table"
+                                },
+                                "limit": {
+                                    "type": "integer",
+                                    "description": "Number of rows to preview (default 10)"
+                                }
+                            },
+                            "required": ["table_name"]
+                        }
+                    }
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "get_table_indexes",
+                        "description": "Get all indexes defined on a specific table. Use this to understand query performance and suggest new indexes.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "table_name": {
+                                    "type": "string",
+                                    "description": "The name of the table"
+                                }
+                            },
+                            "required": ["table_name"]
+                        }
+                    }
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "get_table_foreign_keys",
+                        "description": "Get all foreign key constraints for a specific table. Use this to understand table relationships.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "table_name": {
+                                    "type": "string",
+                                    "description": "The name of the table"
+                                }
+                            },
+                            "required": ["table_name"]
+                        }
+                    }
+                }
+            ]
         })
     };
 

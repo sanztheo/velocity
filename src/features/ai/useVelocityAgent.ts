@@ -58,53 +58,38 @@ interface UseVelocityAgentReturn {
   currentProvider: string;
 }
 
-const SYSTEM_PROMPT = `You are Velocity AI, an expert SQL developer and database administrator assistant integrated into the Velocity database client.
+const SYSTEM_PROMPT = `You are Velocity AI, an expert SQL developer and database administrator assistant.
 
-<identity>
-You are a methodical, intelligent agent that THINKS before acting. You break down complex tasks into manageable steps and verify your work.
-</identity>
+<core_behavior>
+YOU MUST USE YOUR TOOLS. Do NOT just describe what you would do - actually DO IT by calling the appropriate tool.
+When the user asks something about the database, ALWAYS call a tool first to get real information.
+</core_behavior>
 
 <communication>
-1. Be concise and do not repeat yourself.
-2. Be conversational but professional.
-3. Refer to the USER in the second person and yourself in the first person.
-4. Format your responses in markdown. Use backticks to format table, column, and SQL keywords.
-5. NEVER lie or make things up.
+1. Be concise. DO NOT ask for unnecessary confirmations.
+2. Use markdown. Format SQL with \`sql\` code blocks.
+3. NEVER make up table names or data. Use tools to check.
 </communication>
 
-<agentic_workflow>
-For complex multi-step tasks (creating tables, migrations, bulk operations), you MUST follow this workflow:
+<workflow>
+1. **GATHER INFO FIRST**: When asked about schema/tables, IMMEDIATELY call \`list_tables\` or \`get_database_schema\`.
+2. **EXECUTE**: For operations, call the tool directly. One DDL statement at a time.
+3. **SUMMARIZE**: After execution, briefly confirm what was done.
+</workflow>
 
-## 1. PLAN (Think First)
-Before taking ANY action:
-- **Analyze the request**: What exactly does the user want?
-- **Check dependencies**: What tables/schemas need to exist first?
-- **Outline steps**: List the exact sequence of operations.
+<tools_usage>
+- \`list_tables\`: Get all table names. USE THIS when user asks about tables.
+- \`get_table_schema\`: Get columns of a specific table.
+- \`run_sql_query\`: Execute SELECT/INSERT/UPDATE/DELETE queries.
+- \`execute_ddl\`: Execute CREATE/ALTER/DROP statements. ONE statement per call.
+- \`get_table_preview\`: Preview data in a table.
+- \`get_table_indexes\`: Get indexes on a table.
+- \`get_table_foreign_keys\`: Get foreign key relationships.
 
-## 2. EXECUTE (One Step at a Time)
-- Execute ONE operation per tool call
-- For DDL: Execute in dependency order (parents before children)
-- WAIT for each result before proceeding
+IMPORTANT: When user asks to delete/drop tables, first call \`list_tables\` to see what exists, then execute one DROP at a time.
+</tools_usage>`;
 
-## 3. VERIFY (Check Your Work)
-After completing operations, confirm what was created.
-</agentic_workflow>
-
-<tool_calling>
-1. **Always analyze the schema first** before writing queries.
-2. **Explain before acting**: Briefly explain why you are calling a tool.
-3. **Safety First**: For data modification, explain the impact clearly.
-4. **No Hallucinations**: Do not assume table names. Check the schema.
-5. **One operation at a time**: Never try to batch multiple DDL statements.
-</tool_calling>
-
-<formatting>
-- Format SQL queries in code blocks with the language set to \`sql\`.
-- When showing results, summarize large datasets.
-- When presenting a plan, use numbered lists for clarity.
-</formatting>`;
-
-export function useVelocityAgent({ connectionId: _connectionId, mode }: UseVelocityAgentOptions): UseVelocityAgentReturn {
+export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions): UseVelocityAgentReturn {
   const settings = useAISettingsStore();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -112,6 +97,7 @@ export function useVelocityAgent({ connectionId: _connectionId, mode }: UseVeloc
   const [error, setError] = useState<Error | undefined>();
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingSqlConfirmation | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const pendingToolCallsRef = useRef<{ id: string; name: string; args: Record<string, unknown> }[]>([]);
 
   // Load env keys on mount
   useEffect(() => {
@@ -135,10 +121,58 @@ export function useVelocityAgent({ connectionId: _connectionId, mode }: UseVeloc
 
   const generateId = () => `msg-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
+  // Execute a tool call
+  const executeTool = useCallback(async (toolName: string, args: Record<string, unknown>): Promise<unknown> => {
+    console.log('[Execute Tool]', toolName, args);
+    
+    try {
+      switch (toolName) {
+        case 'get_database_schema':
+          return await invoke('get_database_schema_full', { connectionId });
+        
+        case 'run_sql_query':
+          return await invoke('execute_query', { connectionId, sql: args.sql as string });
+        
+        case 'list_tables':
+          return await invoke('list_tables', { connectionId });
+        
+        case 'get_table_schema':
+          return await invoke('get_table_schema', { connectionId, tableName: args.table_name as string });
+        
+        case 'execute_ddl':
+          return await invoke('execute_ddl', { connectionId, sql: args.sql as string });
+        
+        case 'explain_query':
+          return await invoke('explain_query', { connectionId, sql: args.sql as string });
+        
+        case 'get_table_preview':
+          return await invoke('get_table_data', { 
+            connectionId, 
+            tableName: args.table_name as string,
+            limit: (args.limit as number) || 10,
+            offset: 0 
+          });
+        
+        case 'get_table_indexes':
+          return await invoke('get_table_indexes', { connectionId, tableName: args.table_name as string });
+        
+        case 'get_table_foreign_keys':
+          return await invoke('get_table_foreign_keys', { connectionId, tableName: args.table_name as string });
+        
+        default:
+          return { error: `Unknown tool: ${toolName}` };
+      }
+    } catch (e) {
+      console.error(`[Tool Error] ${toolName}:`, e);
+      return { error: String(e) };
+    }
+  }, [connectionId]);
+
   // Send message and stream response
   const append = useCallback(async (message: { role: 'user'; content: string }) => {
     setError(undefined);
     setIsLoading(true);
+    pendingToolCallsRef.current = [];
 
     // Add user message
     const userMsg: ChatMessage = {
@@ -166,13 +200,16 @@ export function useVelocityAgent({ connectionId: _connectionId, mode }: UseVeloc
       const provider = settings.preferredProvider || getBestProvider(settings) || 'grok';
       
       // Get model based on mode
+      // Deep mode uses reasoning-capable models with extended thinking
       let model: string | undefined;
       if (mode === 'deep') {
-        if (provider === 'grok') model = 'grok-3-mini-fast';
-        else if (provider === 'openai') model = 'gpt-4o';
-        else if (provider === 'gemini') model = 'gemini-2.0-flash';
+        // Reasoning models - slower but more thorough, with chain-of-thought
+        if (provider === 'grok') model = 'grok-4.1-fast-reasoning'; // Latest Grok with reasoning
+        else if (provider === 'openai') model = 'o1-mini'; // OpenAI o1 reasoning model
+        else if (provider === 'gemini') model = 'gemini-2.5-flash-preview-05-20'; // Gemini thinking model
       } else {
-        if (provider === 'grok') model = 'grok-3-mini-fast';
+        // Fast mode - quick responses, no reasoning
+        if (provider === 'grok') model = 'grok-4.1-fast'; // Grok 4.1 fast (no reasoning)
         else if (provider === 'openai') model = 'gpt-4o-mini';
         else if (provider === 'gemini') model = 'gemini-2.0-flash';
       }
@@ -192,6 +229,15 @@ export function useVelocityAgent({ connectionId: _connectionId, mode }: UseVeloc
       channel.onmessage = (chunk: AiChatChunk) => {
         console.log('[AI Chunk]', chunk);
 
+        if (chunk.type === 'toolCall') {
+          // Accumulate tool calls for later execution
+          pendingToolCallsRef.current.push({
+            id: chunk.id || `tool-${Date.now()}`,
+            name: chunk.name || 'unknown',
+            args: chunk.arguments ? JSON.parse(chunk.arguments) : {},
+          });
+        }
+
         setMessages(prev => {
           const updated = [...prev];
           const lastIdx = updated.length - 1;
@@ -202,7 +248,6 @@ export function useVelocityAgent({ connectionId: _connectionId, mode }: UseVeloc
 
           switch (chunk.type) {
             case 'textDelta': {
-              // Find existing text part and append to it
               const textPartIdx = parts.findIndex(p => p.type === 'text');
               if (textPartIdx >= 0) {
                 const existingText = parts[textPartIdx].text || '';
@@ -218,7 +263,6 @@ export function useVelocityAgent({ connectionId: _connectionId, mode }: UseVeloc
             }
 
             case 'reasoning': {
-              // Find existing reasoning part and append to it
               const reasoningIdx = parts.findIndex(p => p.type === 'reasoning');
               if (reasoningIdx >= 0) {
                 const existingReasoning = parts[reasoningIdx].text || parts[reasoningIdx].content || '';
@@ -242,7 +286,7 @@ export function useVelocityAgent({ connectionId: _connectionId, mode }: UseVeloc
               break;
 
             case 'done':
-              setIsLoading(false);
+              // Will be handled after the invoke completes
               break;
 
             case 'error':
@@ -270,12 +314,138 @@ export function useVelocityAgent({ connectionId: _connectionId, mode }: UseVeloc
         onEvent: channel,
       });
 
+      // After streaming completes, execute pending tool calls
+      if (pendingToolCallsRef.current.length > 0) {
+        console.log('[Executing Tool Calls]', pendingToolCallsRef.current);
+        const toolResults: { tool_call_id: string; role: 'tool'; content: string }[] = [];
+        const toolCallsCopy = [...pendingToolCallsRef.current]; // Copy before clearing
+        
+        for (const toolCall of pendingToolCallsRef.current) {
+          // Update status to executing
+          setMessages(prev => {
+            const updated = [...prev];
+            const lastIdx = updated.length - 1;
+            if (lastIdx < 0) return prev;
+            
+            const lastMsg = { ...updated[lastIdx] };
+            const parts = [...(lastMsg.parts || [])];
+            const toolPartIdx = parts.findIndex(p => p.type === 'tool-invocation' && p.toolCallId === toolCall.id);
+            if (toolPartIdx >= 0) {
+              parts[toolPartIdx] = { ...parts[toolPartIdx], status: 'executing' };
+            }
+            lastMsg.parts = parts;
+            updated[lastIdx] = lastMsg;
+            return updated;
+          });
+
+          // Execute the tool
+          const result = await executeTool(toolCall.name, toolCall.args);
+          toolResults.push({
+            tool_call_id: toolCall.id,
+            role: 'tool' as const,
+            content: JSON.stringify(result),
+          });
+          
+          // Update with result
+          setMessages(prev => {
+            const updated = [...prev];
+            const lastIdx = updated.length - 1;
+            if (lastIdx < 0) return prev;
+            
+            const lastMsg = { ...updated[lastIdx] };
+            const parts = [...(lastMsg.parts || [])];
+            const toolPartIdx = parts.findIndex(p => p.type === 'tool-invocation' && p.toolCallId === toolCall.id);
+            if (toolPartIdx >= 0) {
+              parts[toolPartIdx] = { 
+                ...parts[toolPartIdx], 
+                status: 'success',
+                result,
+              };
+            }
+            lastMsg.parts = parts;
+            updated[lastIdx] = lastMsg;
+            return updated;
+          });
+        }
+        
+        pendingToolCallsRef.current = [];
+
+        // Send tool results back to AI for final response
+        if (toolResults.length > 0) {
+          console.log('[Sending Tool Results to AI]', toolResults);
+          
+          // Build complete message history with tool results
+          const followUpMessages = [
+            ...apiMessages,
+            {
+              role: 'assistant',
+              content: '',
+              tool_calls: toolCallsCopy.map(tc => ({
+                id: tc.id,
+                type: 'function',
+                function: { name: tc.name, arguments: JSON.stringify(tc.args) }
+              }))
+            },
+            ...toolResults
+          ];
+
+          // Create new channel for follow-up response
+          const followUpChannel = new Channel<AiChatChunk>();
+          
+          followUpChannel.onmessage = (chunk: AiChatChunk) => {
+            console.log('[AI Follow-up Chunk]', chunk);
+
+            if (chunk.type === 'textDelta') {
+              setMessages(prev => {
+                const updated = [...prev];
+                const lastIdx = updated.length - 1;
+                if (lastIdx < 0) return prev;
+                
+                const lastMsg = { ...updated[lastIdx] };
+                const parts = [...(lastMsg.parts || [])];
+                
+                const textPartIdx = parts.findIndex(p => p.type === 'text');
+                if (textPartIdx >= 0) {
+                  const existingText = parts[textPartIdx].text || '';
+                  const newText = existingText + (chunk.text || '');
+                  parts[textPartIdx] = { ...parts[textPartIdx], text: newText };
+                  lastMsg.content = newText;
+                } else {
+                  const newText = chunk.text || '';
+                  parts.push({ type: 'text', text: newText });
+                  lastMsg.content = newText;
+                }
+
+                lastMsg.parts = parts;
+                updated[lastIdx] = lastMsg;
+                return updated;
+              });
+            }
+          };
+
+          // Invoke Tauri command for follow-up
+          await invoke('ai_chat_stream', {
+            request: {
+              messages: followUpMessages,
+              model,
+              provider,
+              systemPrompt: SYSTEM_PROMPT,
+              maxTokens: 4096,
+              temperature: 0.7,
+            },
+            onEvent: followUpChannel,
+          });
+        }
+      }
+      
+      setIsLoading(false);
+
     } catch (e) {
       console.error('[AI Error]', e);
       setError(e instanceof Error ? e : new Error(String(e)));
       setIsLoading(false);
     }
-  }, [messages, settings, mode]);
+  }, [messages, settings, mode, executeTool]);
 
   // Reload last message
   const reload = useCallback(async () => {
