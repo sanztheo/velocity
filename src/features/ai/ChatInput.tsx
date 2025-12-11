@@ -67,7 +67,7 @@ export function ChatInput({
   return (
     <div className="p-4 bg-background border-t">
       <div className={cn(
-        "flex flex-col gap-0 rounded-lg border border-border/50 bg-muted/20 p-2",
+        "flex flex-col gap-0 rounded-xl border border-border/50 bg-muted/20 p-3",
         "focus-within:ring-1 focus-within:ring-ring/50 focus-within:border-ring/50 transition-all duration-200"
       )}>
         
@@ -82,27 +82,26 @@ export function ChatInput({
             disabled={disabled || isLoading}
             rows={1}
             className={cn(
-              "w-full resize-none bg-transparent px-2 py-2",
-              "placeholder:text-muted-foreground/50 focus:outline-none text-sm",
+              "w-full resize-none bg-transparent px-1 py-1 sm:text-sm text-[13px]",
+              "placeholder:text-muted-foreground/50 focus:outline-none",
               "disabled:opacity-50 disabled:cursor-not-allowed",
-              "min-h-[48px] max-h-[300px]"
+              "min-h-[48px] max-h-[300px] pb-3" 
             )}
             style={{ minHeight: '48px' }}
           />
         </div>
 
-        {/* Bottom Toolbar */}
-        <div className="flex w-full items-center justify-between gap-1 px-0.5 mt-1">
-          <div className="flex min-w-0 items-center gap-1">
+        <div className="flex w-full items-center justify-between gap-2 mt-0">
+          <div className="flex min-w-0 items-center gap-0.5">
             
-            {/* Context Add Button (Mock functionality for now to match design) */}
+            {/* Context Add Button */}
             <Button 
               variant="ghost" 
               size="icon" 
-              className="h-6 w-6 rounded-full opacity-70 hover:bg-muted/50 hover:opacity-100"
+              className="h-7 w-7 rounded-lg opacity-70 hover:bg-muted/50 hover:opacity-100 shrink-0"
               title="Add context"
             >
-              <Plus className="h-3.5 w-3.5" />
+              <Plus className="h-4 w-4" />
             </Button>
 
             {/* Mode Selector */}
@@ -111,7 +110,7 @@ export function ChatInput({
             {/* Model Selector */}
             <ModelSelector provider={provider} onChange={onProviderChange} />
             
-            <div className="w-px h-4 bg-border/50 mx-1" />
+            <div className="w-px h-4 bg-border/50 mx-1 shrink-0" />
 
             {/* Auto-Accept Toggle */}
             <Button
@@ -119,7 +118,7 @@ export function ChatInput({
               size="sm"
               onClick={() => onAutoAcceptChange(!autoAccept)}
               className={cn(
-                "h-6 px-2 text-[10px] gap-1.5 font-medium rounded-full transition-colors",
+                "h-7 px-2 text-[11px] gap-1.5 font-medium rounded-lg transition-colors shrink-0",
                 autoAccept 
                   ? "bg-red-500/10 text-red-500 hover:bg-red-500/20" 
                   : "text-muted-foreground hover:bg-muted/50"
@@ -130,7 +129,7 @@ export function ChatInput({
                 "w-1.5 h-1.5 rounded-full",
                 autoAccept ? "bg-red-500" : "bg-muted-foreground/50"
               )} />
-              Auto-Run
+              <span className="truncate">Auto-Run</span>
             </Button>
           </div>
 

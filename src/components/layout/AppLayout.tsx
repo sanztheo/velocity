@@ -51,8 +51,8 @@ export function AppLayout({
               <ResizableHandle className="w-px bg-border hover:bg-primary/50 transition-colors" />
               <ResizablePanel 
                 defaultSize={rightPanelSize} 
-                minSize={20} 
-                maxSize={40}
+                minSize={28} 
+                maxSize={45}
               >
                 {rightPanel}
               </ResizablePanel>

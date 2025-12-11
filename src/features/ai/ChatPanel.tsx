@@ -2,15 +2,15 @@
 // Main AI chat interface container
 
 import { useState, useRef, useEffect } from 'react';
-import { Bot, Key, Settings } from 'lucide-react';
+import { Bot, Key, X } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { useVelocityAgent } from './useVelocityAgent';
 import { useAISettingsStore } from './ai-settings.store';
+import { useAppStore } from '@/stores/app.store';
 import { MessageBubble } from './MessageBubble';
 import { ChatInput } from './ChatInput';
 import { ConfirmationPanel } from './ConfirmationPanel';
-import { AISettingsDialog } from './AISettingsDialog';
 import type { AgentMode } from './types';
 
 interface ChatPanelProps {
@@ -19,9 +19,9 @@ interface ChatPanelProps {
 
 export function ChatPanel({ connectionId }: ChatPanelProps) {
   const [mode, setMode] = useState<AgentMode>('fast');
-  const [showSettings, setShowSettings] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { autoAcceptSql, setAutoAcceptSql, preferredProvider, setPreferredProvider } = useAISettingsStore();
+  const { setAiPanelOpen } = useAppStore();
 
   const agent = useVelocityAgent({ connectionId, mode });
 
@@ -45,7 +45,7 @@ export function ChatPanel({ connectionId }: ChatPanelProps) {
       <div className="flex flex-col h-full">
         <ChatHeader
           provider="None"
-          onOpenSettings={() => setShowSettings(true)}
+          onClose={() => setAiPanelOpen(false)}
         />
         
         <div className="flex-1 flex items-center justify-center p-6">
@@ -57,13 +57,8 @@ export function ChatPanel({ connectionId }: ChatPanelProps) {
             <p className="text-muted-foreground text-sm mb-4">
               Add a Grok, OpenAI, or Gemini API key to start using the AI assistant.
             </p>
-            <Button onClick={() => setShowSettings(true)}>
-              Configure API Keys
-            </Button>
           </div>
         </div>
-
-        <AISettingsDialog open={showSettings} onOpenChange={setShowSettings} />
       </div>
     );
   }
@@ -73,7 +68,7 @@ export function ChatPanel({ connectionId }: ChatPanelProps) {
       {/* Header */}
       <ChatHeader
         provider={agent.currentProvider}
-        onOpenSettings={() => setShowSettings(true)}
+        onClose={() => setAiPanelOpen(false)}
       />
 
       {/* Messages */}
@@ -129,8 +124,7 @@ export function ChatPanel({ connectionId }: ChatPanelProps) {
         onAutoAcceptChange={setAutoAcceptSql}
       />
 
-      {/* Settings dialog */}
-      <AISettingsDialog open={showSettings} onOpenChange={setShowSettings} />
+
     </div>
   );
 }
@@ -138,10 +132,10 @@ export function ChatPanel({ connectionId }: ChatPanelProps) {
 // Header sub-component
 interface ChatHeaderProps {
   provider: string;
-  onOpenSettings: () => void;
+  onClose: () => void;
 }
 
-function ChatHeader({ provider, onOpenSettings }: ChatHeaderProps) {
+function ChatHeader({ provider, onClose }: ChatHeaderProps) {
   return (
     <div className="border-b px-4 py-3 flex items-center justify-between gap-4 bg-background/50 backdrop-blur-sm z-10">
       <div className="flex items-center gap-3">
@@ -155,8 +149,8 @@ function ChatHeader({ provider, onOpenSettings }: ChatHeaderProps) {
           </p>
         </div>
       </div>
-      <Button variant="ghost" size="icon" onClick={onOpenSettings} className="h-8 w-8">
-        <Settings className="h-4 w-4 text-muted-foreground" />
+      <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 rounded-full opacity-70 hover:opacity-100 hover:bg-muted">
+        <X className="h-4 w-4 text-muted-foreground" />
       </Button>
     </div>
   );
