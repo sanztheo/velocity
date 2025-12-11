@@ -192,7 +192,7 @@ export function Sidebar() {
                   onClick={() => setActiveConnection(conn.id)}
                   onDoubleClick={() => handleConnect(conn)}
                 >
-                  <div className="flex items-center gap-2 overflow-hidden">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
                     {state.isConnecting ? (
                       <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" />
                     ) : state.isConnected ? (
@@ -210,7 +210,7 @@ export function Sidebar() {
                       <Database className={cn("h-4 w-4 shrink-0", conn.color ? `text-[${conn.color}]` : "text-muted-foreground")} />
                     )}
                     <span className="truncate">{conn.name}</span>
-                    {conn.favorite && <Star className="h-3 w-3 text-yellow-500 fill-yellow-500" />}
+                    {conn.favorite && <Star className="h-3 w-3 shrink-0 text-yellow-500 fill-yellow-500" />}
                     {state.isConnected && (
                       <span className="h-2 w-2 rounded-full bg-green-500 shrink-0" />
                     )}
@@ -218,7 +218,7 @@ export function Sidebar() {
                   
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                         <MoreVertical className="h-3 w-3" />
                       </Button>
                     </DropdownMenuTrigger>
