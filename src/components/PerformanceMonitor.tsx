@@ -1,18 +1,23 @@
 import { usePerformanceStore } from '@/stores/performanceStore';
 import { Activity, Database, AlertCircle, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 export function PerformanceMonitor() {
   const { lastQueryDuration, lastRowCount, queryCount, isError, lastErrorMessage } = usePerformanceStore();
   const [isVisible, setIsVisible] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  
+  // Dragging state
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const isDraggingRef = useRef(false);
+  const dragStartRef = useRef({ x: 0, y: 0 });
+  const initialOffsetRef = useRef({ x: 0, y: 0 });
 
   // Auto-show when a query happens
   useEffect(() => {
     if (queryCount > 0) {
       setIsVisible(true);
-      // Auto-hide error details after a while if desired, but keeping basic stats visible is better
     }
   }, [queryCount]);
 
@@ -25,8 +30,49 @@ export function PerformanceMonitor() {
     return 'text-red-500';
   };
 
+  const handleMouseDown = (e: React.MouseEvent) => {
+    isDraggingRef.current = false;
+    dragStartRef.current = { x: e.clientX, y: e.clientY };
+    initialOffsetRef.current = { ...offset };
+
+    const handleMouseMove = (mm: MouseEvent) => {
+      const deltaX = mm.clientX - dragStartRef.current.x;
+      const deltaY = mm.clientY - dragStartRef.current.y;
+      
+      // If moved more than 3px, consider it a drag
+      if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) {
+        isDraggingRef.current = true;
+      }
+
+      setOffset({
+        x: initialOffsetRef.current.x + deltaX,
+        y: initialOffsetRef.current.y + deltaY
+      });
+    };
+
+    const handleMouseUp = () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (isDraggingRef.current) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    setIsExpanded(!isExpanded);
+  };
+
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2 text-xs font-mono">
+    <div 
+      className="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2 text-xs font-mono select-none"
+      style={{ transform: `translate(${offset.x}px, ${offset.y}px)` }}
+    >
        {/* Detailed error view if expanded */}
        {isExpanded && isError && lastErrorMessage && (
          <div className="bg-destructive/90 text-destructive-foreground p-3 rounded-md shadow-lg max-w-[300px] animate-in slide-in-from-bottom-2">
@@ -40,10 +86,11 @@ export function PerformanceMonitor() {
       {/* Main Stats Pill */}
       <div 
         className={cn(
-          "flex items-center gap-4 px-3 py-2 rounded-full shadow-lg border backdrop-blur-md transition-all cursor-pointer select-none",
+          "flex items-center gap-4 px-3 py-2 rounded-full shadow-lg border backdrop-blur-md transition-colors cursor-grab active:cursor-grabbing",
           isError ? "bg-destructive/10 border-destructive/50" : "bg-background/80 border-border hover:bg-background"
         )}
-        onClick={() => setIsExpanded(!isExpanded)}
+        onMouseDown={handleMouseDown}
+        onClick={handleClick}
       >
         <div className="flex items-center gap-1.5" title="Execution Time">
           <Clock className={cn("h-3.5 w-3.5", getDurationColor(lastQueryDuration))} />
