@@ -1,11 +1,10 @@
 import { useAppStore } from "@/stores/app.store";
-import { X } from "lucide-react";
+import { X, Bot } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 export function TabBar() {
-  const { tabs, activeTabId, setActiveTab, closeTab } = useAppStore();
-
-  if (tabs.length === 0) return null;
+  const { tabs, activeTabId, setActiveTab, closeTab, activeConnectionId, setAiPanelOpen } = useAppStore();
 
   return (
     <div className="flex items-center border-b bg-background overflow-x-auto no-scrollbar">
@@ -32,6 +31,21 @@ export function TabBar() {
           </button>
         </div>
       ))}
+      
+      {/* AI Assistant Button */}
+      <div className="ml-auto pr-3 py-1">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setAiPanelOpen(true)}
+          disabled={!activeConnectionId}
+          className="gap-2"
+        >
+          <Bot className="h-4 w-4" />
+          <span className="hidden sm:inline">AI Assistant</span>
+        </Button>
+      </div>
     </div>
   );
 }
+

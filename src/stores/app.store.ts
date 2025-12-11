@@ -13,6 +13,7 @@ interface AppState {
   // UI State
   sidebarCollapsed: boolean;
   theme: 'light' | 'dark' | 'system';
+  aiPanelOpen: boolean;
   
   // Actions
   setConnections: (connections: Connection[]) => void;
@@ -29,6 +30,7 @@ interface AppState {
   
   toggleSidebar: () => void;
   setTheme: (theme: 'light' | 'dark' | 'system') => void;
+  setAiPanelOpen: (open: boolean) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -38,6 +40,7 @@ export const useAppStore = create<AppState>((set) => ({
   activeTabId: null,
   sidebarCollapsed: false,
   theme: 'system',
+  aiPanelOpen: false,
   
   setConnections: (connections) => set({ connections }),
   
@@ -110,5 +113,7 @@ export const useAppStore = create<AppState>((set) => ({
     }
     
     return { theme };
-  }
+  },
+  
+  setAiPanelOpen: (open) => set({ aiPanelOpen: open }),
 }));

@@ -224,6 +224,141 @@ pub async fn explain_query(
 }
 
 // ============================================================================
+// AI Agent Commands (LLM-friendly wrappers)
+// ============================================================================
+
+/// Safe query result for AI agent with detailed error information
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SafeQueryResult {
+    pub success: bool,
+    pub columns: Option<Vec<String>>,
+    pub rows: Option<Vec<Vec<serde_json::Value>>>,
+    pub row_count: Option<i64>,
+    pub error_message: Option<String>,
+    pub error_hint: Option<String>,
+}
+
+/// Execute SQL safely with LLM-friendly error messages
+/// This command never errors - it returns structured results including failures
+#[tauri::command]
+pub async fn execute_sql_safe(
+    connection_id: String,
+    sql: String,
+    pool_manager: State<'_, Arc<ConnectionPoolManager>>,
+) -> SafeQueryResult {
+    match pool_manager.execute_query(&connection_id, &sql).await {
+        Ok(result) => SafeQueryResult {
+            success: true,
+            columns: Some(result.columns),
+            rows: Some(result.rows),
+            row_count: Some(result.row_count),
+            error_message: None,
+            error_hint: None,
+        },
+        Err(e) => {
+            let error_str = e.to_string();
+            let hint = generate_error_hint(&error_str, &sql);
+            SafeQueryResult {
+                success: false,
+                columns: None,
+                rows: None,
+                row_count: None,
+                error_message: Some(error_str),
+                error_hint: hint,
+            }
+        }
+    }
+}
+
+/// Generate helpful hints for common SQL errors
+fn generate_error_hint(error: &str, sql: &str) -> Option<String> {
+    let error_lower = error.to_lowercase();
+    let sql_lower = sql.to_lowercase();
+    
+    if error_lower.contains("syntax error") {
+        Some("Check SQL syntax. Common issues: missing quotes, typos in keywords, or incorrect clause order.".to_string())
+    } else if error_lower.contains("relation") && error_lower.contains("does not exist") {
+        Some("The table or view does not exist. Use get_database_schema to see available tables.".to_string())
+    } else if error_lower.contains("column") && error_lower.contains("does not exist") {
+        Some("Column not found. Use get_database_schema to check column names for this table.".to_string())
+    } else if error_lower.contains("permission denied") {
+        Some("Access denied. The user may not have permission for this operation.".to_string())
+    } else if error_lower.contains("duplicate key") || error_lower.contains("unique constraint") {
+        Some("Duplicate value violates a unique constraint. Try using different values or UPDATE instead.".to_string())
+    } else if error_lower.contains("foreign key") {
+        Some("Foreign key constraint violation. The referenced record must exist first.".to_string())
+    } else if error_lower.contains("timeout") {
+        if sql_lower.contains("select") && !sql_lower.contains("limit") {
+            Some("Query timed out. Consider adding a LIMIT clause or optimizing the query.".to_string())
+        } else {
+            Some("Query timed out. The operation took too long to complete.".to_string())
+        }
+    } else {
+        None
+    }
+}
+
+/// Table schema information for AI context
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TableSchemaInfo {
+    pub name: String,
+    pub columns: Vec<ColumnInfo>,
+}
+
+/// Full database schema for AI agent context
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DatabaseSchemaInfo {
+    pub tables: Vec<TableSchemaInfo>,
+    pub views: Vec<String>,
+    pub functions: Vec<String>,
+}
+
+/// Get complete database schema for AI agent
+#[tauri::command]
+pub async fn get_database_schema_full(
+    connection_id: String,
+    pool_manager: State<'_, Arc<ConnectionPoolManager>>,
+) -> Result<DatabaseSchemaInfo, VelocityError> {
+    // Get all tables
+    let table_names = pool_manager.list_tables(&connection_id, None, None).await?;
+    
+    // Get schema for each table
+    let mut tables = Vec::new();
+    for table_name in table_names {
+        match pool_manager.get_table_schema(&connection_id, &table_name).await {
+            Ok(columns) => {
+                tables.push(TableSchemaInfo {
+                    name: table_name,
+                    columns,
+                });
+            }
+            Err(_) => {
+                // Skip tables we can't read schema for
+                tables.push(TableSchemaInfo {
+                    name: table_name,
+                    columns: vec![],
+                });
+            }
+        }
+    }
+    
+    // Get views
+    let views = pool_manager.list_views(&connection_id).await.unwrap_or_default();
+    
+    // Get functions
+    let functions = pool_manager.list_functions(&connection_id).await.unwrap_or_default();
+    
+    Ok(DatabaseSchemaInfo {
+        tables,
+        views,
+        functions,
+    })
+}
+
+// ============================================================================
 // Schema / DDL Commands
 // ============================================================================
 

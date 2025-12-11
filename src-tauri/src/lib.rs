@@ -74,6 +74,8 @@ pub fn run() {
             get_table_indexes,
             // AI commands
             ai_sql_complete,
+            execute_sql_safe,
+            get_database_schema_full,
             // Keychain operations
             save_password,
             get_password,

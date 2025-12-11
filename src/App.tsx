@@ -2,14 +2,17 @@ import { useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useAppStore } from "@/stores/app.store";
 import { Toaster } from "@/components/ui/sonner";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { EnhancedTableViewer } from "@/features/table-viewer";
 import { StructurePanel } from "@/features/structure-editor";
 import { SpotlightSearch } from "@/features/spotlight";
 import { SqlEditor } from "@/features/sql-editor";
 import { ERDiagram } from "@/features/erd";
+import { ChatPanel } from "@/features/ai";
 import { PerformanceMonitor } from "@/components/PerformanceMonitor";
+
 function App() {
-  const { theme, activeTabId, tabs } = useAppStore();
+  const { theme, activeTabId, tabs, aiPanelOpen, setAiPanelOpen, activeConnectionId } = useAppStore();
 
   useEffect(() => {
     // Apply theme to document
@@ -65,6 +68,15 @@ function App() {
         )}
       </AppLayout>
       
+      {/* AI Assistant Sheet */}
+      <Sheet open={aiPanelOpen} onOpenChange={setAiPanelOpen}>
+        <SheetContent side="right" className="w-[500px] sm:max-w-[500px] p-0">
+          {activeConnectionId && (
+            <ChatPanel connectionId={activeConnectionId} />
+          )}
+        </SheetContent>
+      </Sheet>
+      
       <SpotlightSearch />
       <PerformanceMonitor />
       <Toaster position="top-right" />
@@ -73,5 +85,3 @@ function App() {
 }
 
 export default App;
-
-
