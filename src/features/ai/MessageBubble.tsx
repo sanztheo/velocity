@@ -95,15 +95,20 @@ export function MessageBubble({ message }: MessageBubbleProps) {
       {/* Main text content - extract from text parts */}
       {(() => {
         // Extract text content from parts
-        const textContent = parts
+        let textContent = parts
           .filter((p: MessagePart) => p.type === 'text')
           .map((p: MessagePart) => p.content || '')
           .join('');
         
+        // Fallback to top-level content if no parts found (standard for simple messages)
+        if (!textContent && message.content) {
+          textContent = message.content;
+        }
+        
         if (!textContent) return null;
         
         return (
-          <div className="prose prose-sm dark:prose-invert max-w-none">
+          <div className="prose prose-sm dark:prose-invert max-w-none [&>*:not(pre):not(code)]:text-[0.813rem]">
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={{
