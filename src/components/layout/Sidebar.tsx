@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { ModeToggle } from "@/components/mode-toggle";
 import { listen } from "@tauri-apps/api/event"; // Added listen import
 import { useAppStore } from "@/stores/app.store";
 import { useConnections } from "@/hooks/useConnections";
@@ -279,6 +280,12 @@ export function Sidebar() {
         onConfirm={handleConfirmDelete}
         connectionName={connectionToDelete?.name}
       />
+      <div className="p-4 border-t border-sidebar-border mt-auto">
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">Theme</span>
+          <ModeToggle />
+        </div>
+      </div>
     </div>
   );
 }
