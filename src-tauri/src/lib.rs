@@ -73,8 +73,6 @@ pub fn run() {
             preview_drop_constraint,
             get_table_indexes,
             // AI commands
-            ai_sql_complete,
-            ai_chat_stream,
             get_ai_api_keys_status,
             get_ai_api_key,
             execute_sql_safe,

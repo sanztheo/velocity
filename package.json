@@ -10,6 +10,11 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@ai-sdk-tools/agents": "^1.2.0",
+    "@ai-sdk-tools/artifacts": "^1.2.0",
+    "@ai-sdk-tools/devtools": "^1.2.0",
+    "@ai-sdk-tools/memory": "^1.2.0",
+    "@ai-sdk-tools/store": "^1.2.0",
     "@ai-sdk/google": "^2.0.45",
     "@ai-sdk/openai": "^2.0.80",
     "@ai-sdk/react": "^2.0.113",
@@ -44,7 +49,7 @@
     "@types/dagre": "^0.7.53",
     "@types/uuid": "^10.0.0",
     "@xyflow/react": "^12.10.0",
-    "ai": "^5.0.110",
+    "ai": "^5.0.112",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
