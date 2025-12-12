@@ -31,6 +31,7 @@ interface AppState {
   toggleSidebar: () => void;
   setTheme: (theme: 'light' | 'dark' | 'system') => void;
   setAiPanelOpen: (open: boolean) => void;
+  closeTabsForConnection: (connectionId: string) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -138,4 +139,16 @@ export const useAppStore = create<AppState>((set) => ({
   },
   
   setAiPanelOpen: (open) => set({ aiPanelOpen: open }),
+  
+  closeTabsForConnection: (connectionId) => set((state) => {
+    const newTabs = state.tabs.filter((t) => t.connectionId !== connectionId);
+    let newActiveId = state.activeTabId;
+
+    // If active tab was removed, switch to another
+    if (newActiveId && !newTabs.find(t => t.id === newActiveId)) {
+        newActiveId = newTabs.length > 0 ? newTabs[newTabs.length - 1].id : null;
+    }
+
+    return { tabs: newTabs, activeTabId: newActiveId };
+  }),
 }));

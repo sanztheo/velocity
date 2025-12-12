@@ -136,6 +136,10 @@ export function Sidebar() {
     
     setConnectedId(null);
     setConnectionData({ tables: [], views: [], functions: [] });
+    
+    // Close all tabs associated with this connection
+    useAppStore.getState().closeTabsForConnection(connectedId);
+    
     setActiveConnection(null);
   };
 
@@ -295,12 +299,12 @@ export function Sidebar() {
         connectionName={connectionToDelete?.name}
       />
 
-      <div className="py-2 px-2 rounded-xl mt-auto">
-        <div className="flex items-center justify-between">
+      <div className="py-2 px-2 mt-auto">
+        <div className="flex items-center justify-between ">
           <Button 
             variant="ghost" 
             size="sm" 
-            className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground"
+            className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground rounded-xl"
             onClick={() => setIsSettingsOpen(true)}
           >
             <Settings className="h-4 w-4" />
