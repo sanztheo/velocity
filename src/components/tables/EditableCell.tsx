@@ -112,14 +112,23 @@ function parseValue(inputValue: string, dataType: string, originalValue: unknown
   return inputValue;
 }
 
-function getSuggestionsForType(dataType: string, inputValue: string): string[] {
+import { getColumnValues } from '@/lib/tauri';
+
+function getSuggestionsForType(
+  dataType: string, 
+  inputValue: string, 
+  knownValues: string[] = [] // Add knownValues to the function signature
+): string[] {
   const type = dataType.toLowerCase();
   const input = inputValue.toLowerCase();
-  const suggestions: string[] = [];
+  let suggestions: string[] = [];
 
   if (type.includes('bool')) {
     if ('true'.startsWith(input)) suggestions.push('true');
     if ('false'.startsWith(input)) suggestions.push('false');
+  } else if (knownValues.length > 0) {
+      // Filter known values
+      suggestions = knownValues.filter(v => v.toLowerCase().includes(input));
   }
 
   return suggestions;
@@ -127,19 +136,22 @@ function getSuggestionsForType(dataType: string, inputValue: string): string[] {
 
 export function EditableCell({
   value,
-  column: _column,
+  column: _column, // column name
   dataType,
   isEditing,
   isModified,
   isDeleted,
+  connectionId,
+  tableName,
   onStartEdit,
   onSave,
   onCancel,
   onNavigate,
-}: EditableCellProps) {
+}: EditableCellProps & { connectionId?: string; tableName?: string }) { // Add optional props to type
   const [inputValue, setInputValue] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
+  const [columnValues, setColumnValues] = useState<string[]>([]); // Store fetched values
   const inputRef = useRef<HTMLInputElement>(null);
   
   // Initialize input value when editing starts
@@ -147,23 +159,37 @@ export function EditableCell({
     if (isEditing) {
       const initialVal = value === null ? '' : String(value);
       setInputValue(initialVal);
-      // Generate initial suggestions
-      setSuggestions(getSuggestionsForType(dataType, initialVal));
+      
+      // Fetch column values if context is provided and not boolean
+      const type = dataType.toLowerCase();
+      if (!type.includes('bool') && connectionId && tableName) {
+           getColumnValues(connectionId, tableName, _column)
+             .then(values => {
+                 setColumnValues(values);
+                 // Update suggestions immediately after fetch
+                 setSuggestions(getSuggestionsForType(dataType, initialVal, values));
+             })
+             .catch(err => console.error("Failed to fetch column values", err));
+      } else {
+          setColumnValues([]);
+          setSuggestions(getSuggestionsForType(dataType, initialVal, []));
+      }
+      
       setSelectedSuggestionIndex(0);
       
       // Focus after a small delay to ensure DOM is ready
       setTimeout(() => inputRef.current?.focus(), 0);
     }
-  }, [isEditing, value, dataType]); // Added dataType dependency
+  }, [isEditing, value, dataType, connectionId, tableName, _column]); 
 
   // Update suggestions when input changes
   useEffect(() => {
     if (isEditing) {
-      const newSuggestions = getSuggestionsForType(dataType, inputValue);
+      const newSuggestions = getSuggestionsForType(dataType, inputValue, columnValues);
       setSuggestions(newSuggestions);
       setSelectedSuggestionIndex(prev => Math.min(prev, Math.max(0, newSuggestions.length - 1)));
     }
-  }, [inputValue, isEditing, dataType]);
+  }, [inputValue, isEditing, dataType, columnValues]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (suggestions.length > 0) {

@@ -194,8 +194,8 @@ export function TableViewer({ connectionId, tableName }: TableViewerProps) {
       const result = await executeChanges(
         connectionId,
         tableName,
-        backendChanges,
-        primaryKeyColumn
+        primaryKeyColumn,
+        backendChanges
       );
 
       if (result.success) {
@@ -382,6 +382,8 @@ export function TableViewer({ connectionId, tableName }: TableViewerProps) {
                         isEditing={isEditing}
                         isModified={!!change}
                         isDeleted={isDeleted}
+                        connectionId={connectionId}
+                        tableName={tableName}
                         onStartEdit={() => editor.startEditing(rowIndex, col)}
                         onSave={(newValue) => {
                           if (isNewRow) {

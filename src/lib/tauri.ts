@@ -139,6 +139,15 @@ export async function getTableDataFiltered(
   }
 }
 
+// Get distinct values for a column
+export async function getColumnValues(
+  connectionId: string,
+  tableName: string,
+  columnName: string
+): Promise<string[]> {
+  return await invoke("get_column_values", { id: connectionId, tableName, columnName });
+}
+
 // Data editing
 export interface PendingChange {
   rowId: string;

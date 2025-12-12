@@ -232,3 +232,118 @@ fn bson_to_json(bson: &mongodb::bson::Bson) -> serde_json::Value {
         _ => serde_json::Value::String(bson.to_string()),
     }
 }
+
+/// Get distinct values for a column (for autocompletion)
+pub async fn get_column_values(
+    pool: &DatabasePool,
+    table_name: &str,
+    column: &str,
+    limit: i32,
+) -> Result<Vec<String>, VelocityError> {
+    let query = format!(
+        "SELECT DISTINCT {} FROM {} ORDER BY {} LIMIT {}",
+        column, table_name, column, limit
+    );
+
+    match pool {
+        DatabasePool::Postgres(pool) => {
+            let rows = sqlx::query(&query)
+                .fetch_all(pool)
+                .await
+                .map_err(|e| VelocityError::Query(e.to_string()))?;
+            
+            let values: Vec<String> = rows
+                .iter()
+                .map(|row| {
+                    use sqlx::Row;
+                    row.try_get::<String, _>(0)
+                        .or_else(|_| row.try_get::<i64, _>(0).map(|v| v.to_string()))
+                        .or_else(|_| row.try_get::<i32, _>(0).map(|v| v.to_string()))
+                        .or_else(|_| row.try_get::<bool, _>(0).map(|v| v.to_string()))
+                        .unwrap_or_else(|_| "".to_string())
+                })
+                .filter(|s| !s.is_empty())
+                .collect();
+            Ok(values)
+        }
+        DatabasePool::MySQL(pool) => {
+            let rows = sqlx::query(&query)
+                .fetch_all(pool)
+                .await
+                .map_err(|e| VelocityError::Query(e.to_string()))?;
+            
+            let values: Vec<String> = rows
+                .iter()
+                .map(|row| {
+                    use sqlx::Row;
+                    row.try_get::<String, _>(0)
+                        .or_else(|_| row.try_get::<i64, _>(0).map(|v| v.to_string()))
+                        .or_else(|_| row.try_get::<i32, _>(0).map(|v| v.to_string()))
+                        .or_else(|_| row.try_get::<bool, _>(0).map(|v| v.to_string()))
+                        .unwrap_or_else(|_| "".to_string())
+                })
+                .filter(|s| !s.is_empty())
+                .collect();
+            Ok(values)
+        }
+        DatabasePool::SQLite(pool) => {
+             let rows = sqlx::query(&query)
+                .fetch_all(pool)
+                .await
+                .map_err(|e| VelocityError::Query(e.to_string()))?;
+            
+             let values: Vec<String> = rows
+                .iter()
+                .map(|row| {
+                    use sqlx::Row;
+                    row.try_get::<String, _>(0)
+                        .or_else(|_| row.try_get::<i64, _>(0).map(|v| v.to_string()))
+                        .or_else(|_| row.try_get::<i32, _>(0).map(|v| v.to_string()))
+                        .or_else(|_| row.try_get::<bool, _>(0).map(|v| v.to_string()))
+                        .unwrap_or_else(|_| "".to_string())
+                })
+                .filter(|s| !s.is_empty())
+                .collect();
+            Ok(values)
+        }
+        DatabasePool::SQLServer(_) => Ok(vec![]),
+        DatabasePool::Redis(_) => Ok(vec![]),
+        DatabasePool::MongoDB(mongo_pool) => {
+             let db = mongo_pool.client.database(&mongo_pool.database);
+             let collection = db.collection::<Document>(table_name);
+             
+             // Use aggregation to get distinct values with limit
+             let pipeline = vec![
+                 mongodb::bson::doc! { "$group": { "_id": format!("${}", column) } },
+                 mongodb::bson::doc! { "$limit": limit as i64 },
+                 mongodb::bson::doc! { "$project": { "_id": 0, "value": "$_id" } }
+             ];
+             
+             let cursor = collection
+                 .aggregate(pipeline)
+                 .await
+                 .map_err(|e| VelocityError::Query(e.to_string()))?;
+                 
+             let docs: Vec<Document> = cursor
+                 .try_collect()
+                 .await
+                 .map_err(|e| VelocityError::Query(e.to_string()))?;
+                 
+             let values: Vec<String> = docs
+                 .iter()
+                 .filter_map(|doc| {
+                     doc.get("value").map(|bson| match bson {
+                         mongodb::bson::Bson::String(s) => s.clone(),
+                         mongodb::bson::Bson::Int32(i) => i.to_string(),
+                         mongodb::bson::Bson::Int64(i) => i.to_string(),
+                         mongodb::bson::Bson::Boolean(b) => b.to_string(),
+                         _ => "".to_string(),
+                     })
+                 })
+                 .filter(|s| !s.is_empty())
+                 .collect();
+                 
+             Ok(values)
+        }
+    }
+}

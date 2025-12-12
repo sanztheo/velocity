@@ -166,4 +166,18 @@ impl ConnectionPoolManager {
             .ok_or_else(|| VelocityError::NotFound(format!("Connection {} not found", connection_id)))?;
         execute_changes(&pool, table_name, primary_key_column, changes).await
     }
+
+    pub async fn get_column_values(
+        &self,
+        connection_id: &str,
+        table_name: &str,
+        column_name: &str,
+    ) -> Result<Vec<String>, VelocityError> {
+        let pool = self
+            .get_pool(connection_id)
+            .await
+            .ok_or_else(|| VelocityError::Connection("Not connected".to_string()))?;
+        // delegate to data::get_column_values, limit 100
+        super::data::get_column_values(&pool, table_name, column_name, 100).await
+    }
 }

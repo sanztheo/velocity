@@ -58,6 +58,7 @@ pub fn run() {
             get_table_data,
             get_table_data_filtered,
             get_table_foreign_keys,
+            get_column_values, // <-- Added here
             execute_changes,
             execute_query,
             explain_query,

@@ -555,3 +555,16 @@ pub async fn get_table_indexes(
 
     schema_ops::get_table_indexes(pool.as_ref(), &table_name).await
 }
+
+/// Get distinct values for a column (for autocompletion)
+#[tauri::command]
+pub async fn get_column_values(
+    id: String,
+    table_name: String,
+    column_name: String,
+    pool_manager: State<'_, Arc<ConnectionPoolManager>>,
+) -> Result<Vec<String>, VelocityError> {
+    pool_manager
+        .get_column_values(&id, &table_name, &column_name)
+        .await
+}
