@@ -289,12 +289,14 @@ export function Sidebar() {
         onConfirm={handleConfirmDelete}
         connectionName={connectionToDelete?.name}
       />
-      <div className="p-4 border-t border-sidebar-border mt-auto">
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">Theme</span>
-          <ModeToggle />
+      {!connectedConnection && (
+        <div className="p-4 border-t border-sidebar-border mt-auto">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">Theme</span>
+            <ModeToggle />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
