@@ -11,7 +11,7 @@ import type { Mention } from './useMentions';
 // Message types
 export interface ChatMessage {
   id: string;
-  role: 'user' | 'assistant' | 'system';
+  role: 'user' | 'assistant' | 'system' | 'tool';
   content: string;
   parts?: MessagePart[];
   createdAt: Date;
@@ -39,6 +39,14 @@ interface AiChatChunk {
   message?: string;
 }
 
+// API Message type
+type ApiMessage = {
+  role: string;
+  content: string;
+  toolCalls?: { id: string; callType: string; function: { name: string; arguments: string } }[];
+  toolCallId?: string;
+};
+
 interface UseVelocityAgentOptions {
   connectionId: string;
   mode: AgentMode;
@@ -60,7 +68,20 @@ interface UseVelocityAgentReturn {
   currentProvider: string;
 }
 
-// System prompts moved to ai-modes.ts for better separation of concerns
+// Helper to check for destructive SQL
+const isDestructive = (toolName: string, args: Record<string, unknown>): boolean => {
+  if (toolName === 'execute_ddl') return true;
+  if (toolName === 'run_sql_query' && typeof args.sql === 'string') {
+    const sql = args.sql.trim().toUpperCase();
+    return sql.startsWith('INSERT') || 
+           sql.startsWith('UPDATE') || 
+           sql.startsWith('DELETE') || 
+           sql.startsWith('DROP') || 
+           sql.startsWith('ALTER') || 
+           sql.startsWith('TRUNCATE');
+  }
+  return false;
+};
 
 export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions): UseVelocityAgentReturn {
   const settings = useAISettingsStore();
@@ -69,8 +90,16 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | undefined>();
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingSqlConfirmation | null>(null);
+  
+  // State to resume the loop
+  const loopStateRef = useRef<{
+    apiMessages: ApiMessage[];
+    step: number;
+    maxSteps: number;
+    pendingToolCalls: { id: string; name: string; args: Record<string, unknown> }[];
+  } | null>(null);
+
   const abortControllerRef = useRef<AbortController | null>(null);
-  const pendingToolCallsRef = useRef<{ id: string; name: string; args: Record<string, unknown> }[]>([]);
 
   // Load env keys on mount
   useEffect(() => {
@@ -141,103 +170,149 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
     }
   }, [connectionId]);
 
-  // Send message and stream response with agentic loop
-  const append = useCallback(async (
-    message: { role: 'user'; content: string },
-    mentions: Mention[] = [],
+  // Main Agent Loop
+  const runAgentLoop = useCallback(async (
+    initialApiMessages: ApiMessage[],
+    startStep: number,
+    maxSteps: number,
+    initialPendingToolCalls: { id: string; name: string; args: Record<string, unknown> }[] = [],
     enableWebSearch: boolean = false
   ) => {
-    setError(undefined);
-    setIsLoading(true);
-    pendingToolCallsRef.current = [];
-
-    // Add user message
-    const userMsg: ChatMessage = {
-      id: generateId(),
-      role: 'user',
-      content: message.content,
-      parts: [{ type: 'text', text: message.content }],
-      createdAt: new Date(),
-    };
-    setMessages(prev => [...prev, userMsg]);
-
-    // Create assistant message placeholder
-    const assistantId = generateId();
-    const assistantMsg: ChatMessage = {
-      id: assistantId,
-      role: 'assistant',
-      content: '',
-      parts: [],
-      createdAt: new Date(),
-    };
-    setMessages(prev => [...prev, assistantMsg]);
+    let step = startStep;
+    let apiMessages = [...initialApiMessages];
+    let currentPendingToolCalls = [...initialPendingToolCalls];
+    let continueLoop = true;
 
     try {
-      // Get mode-specific configuration
-      const modeConfig = getModeConfig(mode);
-      
-      // Determine provider
-      const provider = (settings.preferredProvider || getBestProvider(settings) || 'grok') as 'grok' | 'openai' | 'gemini';
-      
-      // Get model based on mode and provider from config
-      const model = modeConfig.models[provider];
-      const maxSteps = modeConfig.maxSteps || 5;
-
-      // Build context from mentioned tables
-      let contextPrefix = '';
-      const tableMentions = mentions.filter(m => m.type === 'table');
-      if (tableMentions.length > 0) {
-        const schemaPromises = tableMentions.map(async (m) => {
-          try {
-            const schema = await invoke('get_table_schema', { id: connectionId, tableName: m.value });
-            return `## Table: ${m.value}\n\`\`\`json\n${JSON.stringify(schema, null, 2)}\n\`\`\``;
-          } catch {
-            return `## Table: ${m.value}\n(Failed to load schema)`;
-          }
-        });
-        const schemas = await Promise.all(schemaPromises);
-        contextPrefix = `<context>\nThe user mentioned these tables. Here is their schema:\n${schemas.join('\n\n')}\n</context>\n\n`;
-      }
-
-      // Build initial messages for API
-      // Type for API messages that can include tool calls
-      type ApiMessage = {
-        role: string;
-        content: string;
-        toolCalls?: { id: string; callType: string; function: { name: string; arguments: string } }[];
-        toolCallId?: string;
-      };
-      
-      const apiMessages: ApiMessage[] = messages
-        .filter(m => m.role !== 'system')
-        .map(m => ({
-          role: m.role,
-          content: m.content,
-        }));
-      // Add user message with context prefix
-      apiMessages.push({ role: 'user', content: contextPrefix + message.content });
-
-      // ===== AGENTIC LOOP =====
-      // Continue until no tool calls or maxSteps reached
-      let step = 0;
-      let continueLoop = true;
-
       while (continueLoop && step < maxSteps) {
-        step++;
-        console.log(`[Agent Step ${step}/${maxSteps}]`);
-        
-        // Reset pending tool calls for this step
-        pendingToolCallsRef.current = [];
+        // If we have pending tool calls (from previous iteration or paused state), execute them first
+        if (currentPendingToolCalls.length > 0) {
+          console.log(`[Step ${step}] Processing ${currentPendingToolCalls.length} tool calls`);
+          
+          // Check for destructive commands first
+          const destructiveCall = currentPendingToolCalls.find(tc => 
+             isDestructive(tc.name, tc.args)
+          );
 
-        // Create channel for streaming
+          if (destructiveCall && !settings.autoAcceptSql) {
+            console.log('[Agent] Pausing for confirmation:', destructiveCall);
+            // Save state to resume later
+            loopStateRef.current = {
+              apiMessages,
+              step,
+              maxSteps,
+              pendingToolCalls: currentPendingToolCalls
+            };
+            
+            setPendingConfirmation({
+              toolCallId: destructiveCall.id,
+              sql: destructiveCall.args.sql as string || 'Destructive Operation',
+              isMutation: true,
+            });
+            
+            setIsLoading(false); // Stop loading indicator while waiting
+            return; // EXIT LOOP to wait for user
+          }
+
+          // Execute all tools
+          const toolResults: { tool_call_id: string; role: 'tool'; content: string }[] = [];
+          
+          for (const toolCall of currentPendingToolCalls) {
+            // Update UI status to executing
+            setMessages(prev => {
+              const updated = [...prev];
+              const lastIdx = updated.length - 1;
+              if (lastIdx < 0) return prev;
+              
+              const lastMsg = { ...updated[lastIdx] };
+              const parts = [...(lastMsg.parts || [])];
+              const toolPartIdx = parts.findIndex(p => p.type === 'tool-invocation' && p.toolCallId === toolCall.id);
+              if (toolPartIdx >= 0) {
+                parts[toolPartIdx] = { ...parts[toolPartIdx], status: 'executing' };
+              }
+              lastMsg.parts = parts;
+              updated[lastIdx] = lastMsg;
+              return updated;
+            });
+
+            // Execute
+            const result = await executeTool(toolCall.name, toolCall.args);
+            
+            toolResults.push({
+              tool_call_id: toolCall.id,
+              role: 'tool',
+              content: JSON.stringify(result),
+            });
+
+            // Update UI with result
+            setMessages(prev => {
+              const updated = [...prev];
+              const lastIdx = updated.length - 1;
+              if (lastIdx < 0) return prev;
+              
+              const lastMsg = { ...updated[lastIdx] };
+              const parts = [...(lastMsg.parts || [])];
+              const toolPartIdx = parts.findIndex(p => p.type === 'tool-invocation' && p.toolCallId === toolCall.id);
+              if (toolPartIdx >= 0) {
+                parts[toolPartIdx] = { 
+                  ...parts[toolPartIdx], 
+                  status: 'success',
+                  result,
+                };
+              }
+              lastMsg.parts = parts;
+              updated[lastIdx] = lastMsg;
+              return updated;
+            });
+          }
+
+          // Add assistant tool calls to history (if not already added by the previous generate step)
+          // NOTE: In the standard flow, the assistant message with toolCalls is added BEFORE we get here.
+          // However, if we are resuming, we need to make sure the flow is correct.
+          // The `apiMessages` passed in should ALREADY contain the assistant message that triggered these tools.
+
+          // Add tool results to history
+          for (const tr of toolResults) {
+            apiMessages.push({
+              role: 'tool',
+              content: tr.content,
+              toolCallId: tr.tool_call_id
+            });
+          }
+
+          // Clear pending calls after execution
+          currentPendingToolCalls = [];
+          
+          // Increment step only after full cycle
+          step++;
+        }
+
+        // Generate next response (Reasoning + Tool Calls or Final Text)
+        console.log(`[Agent Step ${step}] Generating next response...`);
+        
+        // Create new assistant message placeholder
+        const assistantId = generateId();
+        const assistantMsg: ChatMessage = {
+          id: assistantId,
+          role: 'assistant',
+          content: '',
+          parts: [],
+          createdAt: new Date(),
+        };
+        setMessages(prev => [...prev, assistantMsg]);
+
+        // Get config
+        const modeConfig = getModeConfig(mode);
+        const provider = (settings.preferredProvider || getBestProvider(settings) || 'grok') as 'grok' | 'openai' | 'gemini';
+        const model = modeConfig.models[provider];
+
+        // Create channel
         const channel = new Channel<AiChatChunk>();
+        const newToolCalls: { id: string; name: string; args: Record<string, unknown> }[] = [];
 
         channel.onmessage = (chunk: AiChatChunk) => {
-          console.log(`[Step ${step}] Chunk:`, chunk);
-
-          if (chunk.type === 'toolCall') {
-            // Accumulate tool calls for later execution
-            pendingToolCallsRef.current.push({
+             if (chunk.type === 'toolCall') {
+            newToolCalls.push({
               id: chunk.id || `tool-${Date.now()}`,
               name: chunk.name || 'unknown',
               args: chunk.arguments ? JSON.parse(chunk.arguments) : {},
@@ -303,7 +378,7 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
           });
         };
 
-        // Invoke Tauri command
+        // Invoke Tauri
         await invoke('ai_chat_stream', {
           request: {
             messages: apiMessages,
@@ -312,108 +387,172 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
             systemPrompt: modeConfig.systemPrompt,
             maxTokens: modeConfig.maxTokens,
             temperature: modeConfig.temperature,
-            enableWebSearch: step === 1 ? enableWebSearch : false, // Only enable web search on first step
+            enableWebSearch: step === 0 && enableWebSearch, 
           },
           onEvent: channel,
         });
 
-        // Check if we have tool calls to execute
-        if (pendingToolCallsRef.current.length === 0) {
-          // No tool calls, we're done!
-          console.log(`[Step ${step}] No tool calls, ending loop`);
+        // Decide next step
+        if (newToolCalls.length === 0) {
+          console.log(`[Step ${step}] No new tool calls. Detailed finished.`);
           continueLoop = false;
         } else {
-          // Execute tool calls and prepare for next iteration
-          console.log(`[Step ${step}] Executing ${pendingToolCallsRef.current.length} tool calls`);
-          const toolCallsCopy = [...pendingToolCallsRef.current];
-          const toolResults: { tool_call_id: string; role: 'tool'; content: string }[] = [];
-
-          for (const toolCall of toolCallsCopy) {
-            // Update status to executing
-            setMessages(prev => {
-              const updated = [...prev];
-              const lastIdx = updated.length - 1;
-              if (lastIdx < 0) return prev;
-              
-              const lastMsg = { ...updated[lastIdx] };
-              const parts = [...(lastMsg.parts || [])];
-              const toolPartIdx = parts.findIndex(p => p.type === 'tool-invocation' && p.toolCallId === toolCall.id);
-              if (toolPartIdx >= 0) {
-                parts[toolPartIdx] = { ...parts[toolPartIdx], status: 'executing' };
-              }
-              lastMsg.parts = parts;
-              updated[lastIdx] = lastMsg;
-              return updated;
-            });
-
-            // Execute the tool
-            const result = await executeTool(toolCall.name, toolCall.args);
-            toolResults.push({
-              tool_call_id: toolCall.id,
-              role: 'tool' as const,
-              content: JSON.stringify(result),
-            });
-            
-            // Update with result
-            setMessages(prev => {
-              const updated = [...prev];
-              const lastIdx = updated.length - 1;
-              if (lastIdx < 0) return prev;
-              
-              const lastMsg = { ...updated[lastIdx] };
-              const parts = [...(lastMsg.parts || [])];
-              const toolPartIdx = parts.findIndex(p => p.type === 'tool-invocation' && p.toolCallId === toolCall.id);
-              if (toolPartIdx >= 0) {
-                parts[toolPartIdx] = { 
-                  ...parts[toolPartIdx], 
-                  status: 'success',
-                  result,
-                };
-              }
-              lastMsg.parts = parts;
-              updated[lastIdx] = lastMsg;
-              return updated;
-            });
-          }
-
-          // Add assistant message with tool calls to history
+          console.log(`[Step ${step}] Received ${newToolCalls.length} new tool calls.`);
+          currentPendingToolCalls = newToolCalls;
+          
+           // Add assistant message with tool calls to history explicitly
           apiMessages.push({
             role: 'assistant',
-            content: '',
-            toolCalls: toolCallsCopy.map(tc => ({
+            content: '', // Content is often empty for tool calls in newer models
+            toolCalls: newToolCalls.map(tc => ({
               id: tc.id,
               callType: 'function',
               function: { name: tc.name, arguments: JSON.stringify(tc.args) }
             }))
           });
-
-          // Add tool results to history
-          for (const tr of toolResults) {
-            apiMessages.push({
-              role: 'tool',
-              content: tr.content,
-              toolCallId: tr.tool_call_id
-            });
-          }
-
-          console.log(`[Step ${step}] Added results to history, continuing loop...`);
         }
-      }
-
-      if (step >= maxSteps) {
-        console.log(`[Agent] Reached maxSteps (${maxSteps}), stopping`);
-      }
+      } 
       
       setIsLoading(false);
+      loopStateRef.current = null; // Clear state on success
 
     } catch (e) {
-      console.error('[AI Error]', e);
+      console.error('[Agent Loop Error]', e);
       setError(e instanceof Error ? e : new Error(String(e)));
       setIsLoading(false);
+      loopStateRef.current = null;
     }
-  }, [messages, settings, mode, executeTool, connectionId]);
+  }, [mode, settings, executeTool]);
 
-  // Reload last message
+
+  // Initialize conversation
+  const append = useCallback(async (
+    message: { role: 'user'; content: string },
+    mentions: Mention[] = [],
+    enableWebSearch: boolean = false
+  ) => {
+    setError(undefined);
+    setIsLoading(true);
+    loopStateRef.current = null; // Clear any old state
+
+    // Add user message to UI
+    const userMsg: ChatMessage = {
+      id: generateId(),
+      role: 'user',
+      content: message.content,
+      parts: [{ type: 'text', text: message.content }],
+      createdAt: new Date(),
+    };
+    setMessages(prev => [...prev, userMsg]);
+
+    const modeConfig = getModeConfig(mode);
+    const maxSteps = modeConfig.maxSteps || 5;
+
+    // Build context
+    let contextPrefix = '';
+    const tableMentions = mentions.filter(m => m.type === 'table');
+    if (tableMentions.length > 0) {
+      const schemaPromises = tableMentions.map(async (m) => {
+        try {
+          const schema = await invoke('get_table_schema', { id: connectionId, tableName: m.value });
+          return `## Table: ${m.value}\n\`\`\`json\n${JSON.stringify(schema, null, 2)}\n\`\`\``;
+        } catch {
+          return `## Table: ${m.value}\n(Failed to load schema)`;
+        }
+      });
+      const schemas = await Promise.all(schemaPromises);
+      contextPrefix = `<context>\nThe user mentioned these tables. Here is their schema:\n${schemas.join('\n\n')}\n</context>\n\n`;
+    }
+
+    // Prepare API messages history
+    const apiMessages: ApiMessage[] = messages
+        .filter(m => m.role !== 'system')
+        .map(m => ({
+          role: m.role,
+          content: m.content,
+        }));
+    apiMessages.push({ role: 'user', content: contextPrefix + message.content });
+
+    // Start Loop
+    await runAgentLoop(apiMessages, 0, maxSteps, [], enableWebSearch);
+
+  }, [messages, mode, connectionId, runAgentLoop]);
+
+  // Confirm SQL execution
+  const confirmSql = useCallback(async () => {
+    if (!pendingConfirmation || !loopStateRef.current) {
+        setPendingConfirmation(null);
+        return;
+    }
+
+    const { apiMessages, step, maxSteps, pendingToolCalls } = loopStateRef.current;
+    setPendingConfirmation(null);
+    setIsLoading(true);
+
+    // Resume loop
+    await runAgentLoop(apiMessages, step, maxSteps, pendingToolCalls);
+
+  }, [pendingConfirmation, runAgentLoop]);
+
+  // Reject SQL
+  const rejectSql = useCallback(async (reason: string) => {
+    if (!pendingConfirmation || !loopStateRef.current) {
+        setPendingConfirmation(null);
+        return;
+    }
+
+    const { apiMessages, step, maxSteps, pendingToolCalls } = loopStateRef.current;
+    
+    // We need to simulate tool outputs being "Error/Rejected" for ALL pending calls
+    const rejectedToolResults = pendingToolCalls.map(tc => ({
+        tool_call_id: tc.id,
+        role: 'tool' as const,
+        content: JSON.stringify({ error: `User rejected execution: ${reason}` })
+    }));
+
+    // Update UI to show rejection
+    setMessages(prev => {
+        const updated = [...prev];
+        const lastIdx = updated.length - 1;
+        if (lastIdx < 0) return prev;
+        
+        const lastMsg = { ...updated[lastIdx] };
+        const parts = [...(lastMsg.parts || [])];
+        
+        pendingToolCalls.forEach(tc => {
+            const partIdx = parts.findIndex(p => p.type === 'tool-invocation' && p.toolCallId === tc.id);
+            if (partIdx >= 0) {
+                parts[partIdx] = { 
+                    ...parts[partIdx], 
+                    status: 'error', 
+                    result: { error: `Rejected: ${reason}` } 
+                };
+            }
+        });
+
+        lastMsg.parts = parts;
+        updated[lastIdx] = lastMsg;
+        return updated;
+    });
+
+    setPendingConfirmation(null);
+    setIsLoading(true);
+
+    // Add rejection results to history
+    const nextApiMessages = [...apiMessages];
+    for (const tr of rejectedToolResults) {
+        nextApiMessages.push({
+            role: 'tool',
+            content: tr.content,
+            toolCallId: tr.tool_call_id
+        });
+    }
+
+    // Resume loop so agent can handle the rejection (e.g. apologize or try something else)
+    await runAgentLoop(nextApiMessages, step + 1, maxSteps, []); // Empty pending calls, just generate next response
+
+  }, [pendingConfirmation, runAgentLoop]);
+
   const reload = useCallback(async () => {
     if (messages.length < 2) return;
     const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
@@ -423,20 +562,10 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
     }
   }, [messages, append]);
 
-  // Stop streaming
   const stop = useCallback(() => {
     abortControllerRef.current?.abort();
     setIsLoading(false);
-  }, []);
-
-  // Confirm SQL execution
-  const confirmSql = useCallback(async () => {
-    if (!pendingConfirmation) return;
-    setPendingConfirmation(null);
-  }, [pendingConfirmation]);
-
-  // Reject SQL
-  const rejectSql = useCallback(async (_reason: string) => {
+    loopStateRef.current = null;
     setPendingConfirmation(null);
   }, []);
 

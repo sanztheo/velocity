@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="dark-mode-black-bg.png" alt="Velocity Logo" width="600"/>
+  <img src="dark-mode.png" alt="Velocity Logo" width="200"/>
 </p>
 
 <h1 align="center">⚡ Velocity</h1>
