@@ -91,12 +91,13 @@ impl ConnectionPoolManager {
         connection_id: &str,
         limit: Option<u32>,
         offset: Option<u32>,
+        search: Option<String>,
     ) -> Result<Vec<String>, VelocityError> {
         let pool = self
             .get_pool(connection_id)
             .await
             .ok_or_else(|| VelocityError::Connection("Not connected".to_string()))?;
-        list_tables(&pool, limit, offset).await
+        list_tables(&pool, limit, offset, search).await
     }
 
     pub async fn list_views(&self, connection_id: &str) -> Result<Vec<String>, VelocityError> {

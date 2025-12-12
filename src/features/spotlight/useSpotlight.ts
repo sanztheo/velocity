@@ -21,7 +21,7 @@ interface ConnectionData {
 export function useSpotlight() {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
-  const [connectionData, setConnectionData] = useState<Record<string, ConnectionData>>({});
+  const [connectionData, setConnectionData] = useState<ConnectionData>({ tables: [], views: [], functions: [] });
   const [isLoading, setIsLoading] = useState(false);
 
   const { connections, activeConnectionId, addTab, setActiveConnection } = useAppStore();
@@ -39,56 +39,54 @@ export function useSpotlight() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Load data for active connection when spotlight opens
+  // Debounced search for tables
   useEffect(() => {
     if (!open || !activeConnectionId) return;
-    
-    // Only load if not already cached
-    if (connectionData[activeConnectionId]) return;
 
-    const loadData = async () => {
+    const fetchResults = async () => {
       setIsLoading(true);
       try {
+        // We limit to 20 results for spotlight performance
+        // If search is empty, we just get the first 20 tables as "recent" or "top"
         const [tables, views, functions] = await Promise.all([
-          listTables(activeConnectionId),
-          listViews(activeConnectionId),
+          listTables(activeConnectionId, 20, 0, search), 
+          listViews(activeConnectionId), // Views might not need search yet or we can add it later
           listFunctions(activeConnectionId),
         ]);
         
-        setConnectionData(prev => ({
-          ...prev,
-          [activeConnectionId]: { tables, views, functions },
-        }));
-      } catch {
-        // Connection might not be active
+        setConnectionData({ tables, views, functions });
+      } catch (error) {
+        console.error("Failed to search tables", error);
       } finally {
         setIsLoading(false);
       }
     };
 
-    loadData();
-  }, [open, activeConnectionId, connectionData]);
+    const timer = setTimeout(fetchResults, 300); // 300ms debounce
+    return () => clearTimeout(timer);
+  }, [open, activeConnectionId, search]);
+
 
   // Build searchable items
   const items = useMemo<SpotlightItem[]>(() => {
     const result: SpotlightItem[] = [];
     const activeConn = connections.find(c => c.id === activeConnectionId);
 
-    // Add connections
+    // 1. Add connections (Client-side filtered)
     connections.forEach(conn => {
-      result.push({
-        id: `conn-${conn.id}`,
-        type: 'connection',
-        name: conn.name,
-        connectionId: conn.id,
-      });
+      if (!search || conn.name.toLowerCase().includes(search.toLowerCase())) {
+        result.push({
+          id: `conn-${conn.id}`,
+          type: 'connection',
+          name: conn.name,
+          connectionId: conn.id,
+        });
+      }
     });
 
-    // Add database objects for active connection
-    if (activeConnectionId && connectionData[activeConnectionId]) {
-      const data = connectionData[activeConnectionId];
-      
-      data.tables.forEach(table => {
+    // 2. Add database objects for active connection (Server-side filtered already)
+    if (activeConnectionId) {
+      connectionData.tables.forEach(table => {
         result.push({
           id: `table-${activeConnectionId}-${table}`,
           type: 'table',
@@ -98,57 +96,59 @@ export function useSpotlight() {
         });
       });
 
-      data.views.forEach(view => {
-        result.push({
-          id: `view-${activeConnectionId}-${view}`,
-          type: 'view',
-          name: view,
-          connectionId: activeConnectionId,
-          connectionName: activeConn?.name,
-        });
+      // Views and Functions are currently taking all, we might want to client-side filter them
+      // if the backend doesn't support search for them yet (it supports it for tables now)
+      // Since we didn't update listViews/listFunctions backend yet, we filter here:
+      connectionData.views.forEach(view => {
+        if (!search || view.toLowerCase().includes(search.toLowerCase())) {
+          result.push({
+            id: `view-${activeConnectionId}-${view}`,
+            type: 'view',
+            name: view,
+            connectionId: activeConnectionId,
+            connectionName: activeConn?.name,
+          });
+        }
       });
 
-      data.functions.forEach(fn => {
-        result.push({
-          id: `func-${activeConnectionId}-${fn}`,
-          type: 'function',
-          name: fn,
-          connectionId: activeConnectionId,
-          connectionName: activeConn?.name,
-        });
+      connectionData.functions.forEach(fn => {
+        if (!search || fn.toLowerCase().includes(search.toLowerCase())) {
+           result.push({
+            id: `func-${activeConnectionId}-${fn}`,
+            type: 'function',
+            name: fn,
+            connectionId: activeConnectionId,
+            connectionName: activeConn?.name,
+          });
+        }
       });
     }
 
-    // Quick actions - only show if connected
+    // 3. Quick actions
     if (activeConnectionId) {
-      result.push({
+       const actions = [{
         id: 'action-new-query',
-        type: 'action',
+        type: 'action' as const,
         name: 'New SQL Query',
         connectionId: activeConnectionId,
         connectionName: activeConn?.name,
         shortcut: '⌘T',
+      }];
+
+      actions.forEach(action => {
+          if (!search || action.name.toLowerCase().includes(search.toLowerCase())) {
+              result.push(action);
+          }
       });
     }
 
     return result;
-  }, [connections, activeConnectionId, connectionData]);
-
-  // Filter items based on search
-  const filteredItems = useMemo(() => {
-    if (!search.trim()) return items;
-
-    const query = search.toLowerCase();
-    return items.filter(item => 
-      item.name.toLowerCase().includes(query) ||
-      item.type.toLowerCase().includes(query)
-    );
-  }, [items, search]);
+  }, [connections, activeConnectionId, connectionData, search]);
 
   // Handle item selection
   const handleSelect = useCallback((item: SpotlightItem) => {
     setOpen(false);
-    setSearch('');
+    setSearch(''); // Reset search on close
 
     switch (item.type) {
       case 'table':
@@ -185,7 +185,7 @@ export function useSpotlight() {
     setOpen,
     search,
     setSearch,
-    items: filteredItems,
+    items, // Items are now mixed (server results + client filtered others)
     isLoading,
     handleSelect,
   };

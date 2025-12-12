@@ -39,12 +39,27 @@ pub async fn list_tables(
     pool: &DatabasePool,
     limit: Option<u32>,
     offset: Option<u32>,
+    search: Option<String>,
 ) -> Result<Vec<String>, VelocityError> {
     println!("[VELOCITY] Executing list_tables query...");
 
     match pool {
         DatabasePool::Postgres(pool) => {
-            let mut query = "SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename".to_string();
+            let mut query = "SELECT tablename FROM pg_tables WHERE schemaname = 'public'".to_string();
+            
+            if let Some(s) = &search {
+                // Using parameterized query would be better but for building dynamic query string with variable clauses
+                // ensuring valid identifier characters or using basic sanitization is key.
+                // For simplicity here, we assume standard LIKE. Ideally use bind.
+                // Due to complexity of dynamic LIKE with sqlx query_as string, strict construction is needed.
+                // We'll trust the input is reasonably safe or sanitized by frontend/tauri binding layer for now,
+                // BUT better to just filter in WHERE.
+                // Simpler approach:
+                query.push_str(&format!(" AND tablename ILIKE '%{}%'", s.replace("'", "''")));
+            }
+            
+            query.push_str(" ORDER BY tablename");
+
             if let Some(l) = limit {
                 query.push_str(&format!(" LIMIT {}", l));
             }
@@ -59,8 +74,17 @@ pub async fn list_tables(
             Ok(rows.into_iter().map(|r| r.0).collect())
         }
         DatabasePool::MySQL(pool) => {
-            println!("[VELOCITY] MySQL: Using SHOW TABLES query...");
             let mut query = "SHOW TABLES".to_string();
+            let mut has_where = false;
+
+            if let Some(s) = &search {
+                query.push_str(&format!(" WHERE Tables_in_{} LIKE '%{}%'", "TODO_DB_NAME_FIX", s.replace("'", "''")));
+                // SHOW TABLES doesn't easily support simple WHERE LIKE without knowing the db name col header in result
+                // Actually MySQL 'SHOW TABLES LIKE' pattern is supported.
+                query = format!("SHOW TABLES LIKE '%{}%'", s.replace("'", "''"));
+            }
+            
+            // Re-apply limit/offset
             if let Some(l) = limit {
                 query.push_str(&format!(" LIMIT {}", l));
             }
@@ -72,11 +96,17 @@ pub async fn list_tables(
                 .fetch_all(pool)
                 .await
                 .map_err(|e| VelocityError::Query(e.to_string()))?;
-            println!("[VELOCITY] MySQL: Got {} tables", rows.len());
             Ok(rows.into_iter().map(|r| r.0).collect())
         }
         DatabasePool::SQLite(pool) => {
-            let mut query = "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name".to_string();
+            let mut query = "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'".to_string();
+            
+            if let Some(s) = &search {
+                query.push_str(&format!(" AND name LIKE '%{}%'", s.replace("'", "''")));
+            }
+            
+            query.push_str(" ORDER BY name");
+
             if let Some(l) = limit {
                 query.push_str(&format!(" LIMIT {}", l));
             }
@@ -98,11 +128,24 @@ pub async fn list_tables(
                 .await
                 .map_err(|e| VelocityError::Connection(e.to_string()))?;
 
+            // Redis KEYS is case sensitive, but we can't easily do efficient case-insensitive wildcard on server
+            // without SCAN and filtering. For now, since we fetch keys then filter?
+            // Wait, the previous impl used KEYS *search*.
+            // If we want FULL consistency, we should fetch more and filter in Rust, or accept case-sensitivity.
+            // Given it's Redis, KEYS is dangerous in prod anyway, but this is a desktop app connection.
+            // Let's stick to simple *pattern* for now, but if the user types lowercase 'user', and key is 'User', KEYS *user* won't find it.
+            // Better approach for consistency: Scan/Keys * then filter in Rust.
+            
             let mut keys: Vec<String> = redis::cmd("KEYS")
-                .arg("*")
+                .arg("*") // Fetch all, then filter. Safe for small/desktop apps.
                 .query_async(&mut conn)
                 .await
                 .map_err(|e| VelocityError::Query(e.to_string()))?;
+
+            if let Some(s) = search {
+                let s_lower = s.to_lowercase();
+                keys.retain(|k| k.to_lowercase().contains(&s_lower));
+            }
 
             keys.sort();
 
@@ -126,6 +169,11 @@ pub async fn list_tables(
                 .await
                 .map_err(|e| VelocityError::Query(e.to_string()))?;
             
+            if let Some(s) = search {
+                 let s_lower = s.to_lowercase();
+                 collections.retain(|c| c.to_lowercase().contains(&s_lower));
+            }
+
             collections.sort();
             
             let start = offset.unwrap_or(0) as usize;

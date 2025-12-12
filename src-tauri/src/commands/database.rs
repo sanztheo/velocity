@@ -62,9 +62,10 @@ pub async fn list_tables(
     id: String,
     limit: Option<u32>,
     offset: Option<u32>,
+    search: Option<String>,
     pool_manager: State<'_, Arc<ConnectionPoolManager>>,
 ) -> Result<Vec<String>, VelocityError> {
-    pool_manager.list_tables(&id, limit, offset).await
+    pool_manager.list_tables(&id, limit, offset, search).await
 }
 
 /// List views for a connection
@@ -341,7 +342,7 @@ pub async fn get_database_schema_full(
     pool_manager: State<'_, Arc<ConnectionPoolManager>>,
 ) -> Result<DatabaseSchemaInfo, VelocityError> {
     // Get all tables
-    let table_names = pool_manager.list_tables(&id, None, None).await?;
+    let table_names = pool_manager.list_tables(&id, None, None, None).await?;
     
     // Get schema for each table
     let mut tables = Vec::new();
