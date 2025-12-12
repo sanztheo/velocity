@@ -1,0 +1,482 @@
+<div
+  dir="ltr"
+  data-slot="scroll-area"
+  class="relative flex-1 min-h-0 px-4"
+  style="
+    position: relative;
+    --radix-scroll-area-corner-width: 0px;
+    --radix-scroll-area-corner-height: 0px;
+  "
+>
+  <style>
+    [data-radix-scroll-area-viewport] {
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      -webkit-overflow-scrolling: touch;
+    }
+    [data-radix-scroll-area-viewport]::-webkit-scrollbar {
+      display: none;
+    }
+  </style>
+  <div
+    data-radix-scroll-area-viewport=""
+    data-slot="scroll-area-viewport"
+    class="focus-visible:ring-ring/50 size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:outline-1"
+    style="overflow: hidden scroll"
+  >
+    <div style="min-width: 100%; display: table">
+      <div class="px-4 py-4 bg-transparent">
+        <div class="group mt-1 flex w-full flex-row items-start gap-2">
+          <div class="relative flex grow flex-col items-stretch min-w-0">
+            <div
+              class="grow rounded-lg border border-border/10 bg-muted/20 p-2 break-words"
+            >
+              <div
+                class="max-w-none break-words whitespace-pre-wrap text-[0.813rem] leading-relaxed text-foreground"
+              >
+                <p>analyse ma db t’en pense quo</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="px-4 py-4 border-b border-border/50">
+        <div
+          class="max-w-none min-w-0 break-words whitespace-pre-wrap text-[0.813rem] leading-relaxed text-foreground"
+        >
+          <p class="mb-2 last:mb-0" node="[object Object]">
+            Checking database...
+          </p>
+        </div>
+        <div class="border rounded-lg p-3 mb-3 bg-background/50">
+          <div class="flex items-center gap-2 mb-2">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="lucide lucide-circle-check-big h-4 w-4 text-green-500"
+              aria-hidden="true"
+            >
+              <path d="M21.801 10A10 10 0 1 1 17 3.335"></path>
+              <path d="m9 11 3 3L22 4"></path></svg
+            ><svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="lucide lucide-database h-4 w-4 text-muted-foreground"
+              aria-hidden="true"
+            >
+              <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+              <path d="M3 5V19A9 3 0 0 0 21 19V5"></path>
+              <path d="M3 12A9 3 0 0 0 21 12"></path></svg
+            ><span
+              data-slot="badge"
+              class="inline-flex items-center justify-center rounded-full border px-2 py-0.5 font-medium w-fit whitespace-nowrap shrink-0 [&amp;&gt;svg]:size-3 gap-1 [&amp;&gt;svg]:pointer-events-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive transition-[color,box-shadow] overflow-hidden text-foreground [a&amp;]:hover:bg-accent [a&amp;]:hover:text-accent-foreground font-mono text-xs"
+              >Get Database Schema</span
+            ><span class="text-xs ml-auto font-medium text-green-500"
+              >Success</span
+            >
+          </div>
+          <details class="mt-2">
+            <summary
+              class="text-xs cursor-pointer text-muted-foreground hover:text-foreground"
+            >
+              View Result
+            </summary>
+            <pre
+              class="text-xs bg-muted p-2 rounded mt-1 whitespace-pre-wrap break-all font-mono max-h-48 overflow-y-auto"
+            >
+{
+  "tables": [
+    {
+      "name": "activity_logs",
+      "columns": [
+        {
+          "name": "id",
+          "dataType": "uuid",
+          "nullable": false,
+          "maxLength": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "user_id",
+          "dataType": "character varying",
+          "nullable": false,
+          "maxLength": 255,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "workspace_id",
+          "dataType": "uuid",
+       
+... (truncated)</pre
+            >
+          </details>
+        </div>
+        <div class="border rounded-lg p-3 mb-3 bg-background/50">
+          <div class="flex items-center gap-2 mb-2">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="lucide lucide-circle-check-big h-4 w-4 text-green-500"
+              aria-hidden="true"
+            >
+              <path d="M21.801 10A10 10 0 1 1 17 3.335"></path>
+              <path d="m9 11 3 3L22 4"></path></svg
+            ><svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="lucide lucide-file-code h-4 w-4 text-muted-foreground"
+              aria-hidden="true"
+            >
+              <path
+                d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"
+              ></path>
+              <path d="M14 2v5a1 1 0 0 0 1 1h5"></path>
+              <path d="M10 12.5 8 15l2 2.5"></path>
+              <path d="m14 12.5 2 2.5-2 2.5"></path></svg
+            ><span
+              data-slot="badge"
+              class="inline-flex items-center justify-center rounded-full border px-2 py-0.5 font-medium w-fit whitespace-nowrap shrink-0 [&amp;&gt;svg]:size-3 gap-1 [&amp;&gt;svg]:pointer-events-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive transition-[color,box-shadow] overflow-hidden text-foreground [a&amp;]:hover:bg-accent [a&amp;]:hover:text-accent-foreground font-mono text-xs"
+              >List Tables</span
+            ><span class="text-xs ml-auto font-medium text-green-500"
+              >Success</span
+            >
+          </div>
+          <details class="mt-2">
+            <summary
+              class="text-xs cursor-pointer text-muted-foreground hover:text-foreground"
+            >
+              View Result
+            </summary>
+            <pre
+              class="text-xs bg-muted p-2 rounded mt-1 whitespace-pre-wrap break-all font-mono max-h-48 overflow-y-auto"
+            >
+[
+  "activity_logs",
+  "ai_conversations",
+  "ai_messages",
+  "daily_articles",
+  "openai_usage_log",
+  "pages",
+  "projects",
+  "quiz_results",
+  "quiz_sequences",
+  "quiz_templates",
+  "quizzes",
+  "updates",
+  "usage_records",
+  "user_dashboard_layouts",
+  "user_limits",
+  "user_quiz_preferences",
+  "user_subscriptions",
+  "users",
+  "webhook_events",
+  "workspace_members",
+  "workspaces",
+  "yjs_documents",
+  "yjs_updates"
+]</pre
+            >
+          </details>
+        </div>
+      </div>
+      <div class="px-4 py-4 border-b border-border/50">
+        <div
+          class="max-w-none min-w-0 break-words whitespace-pre-wrap text-[0.813rem] leading-relaxed text-foreground"
+        >
+          <h2 class="mt-3 mb-2 text-base font-semibold" node="[object Object]">
+            Analyse de ta DB
+          </h2>
+          <p class="mb-2 last:mb-0" node="[object Object]">
+            <strong>Verdict global : 👍 Solide app SaaS éducative/AI !</strong
+            ><br />
+            C'est une plateforme d'apprentissage avec
+            <strong>workspaces collaboratifs</strong>,
+            <strong>quizz AI avancés</strong> (templates, séquences, résultats
+            détaillés), <strong>pages/projets notepads</strong> (Yjs collab
+            realtime), et <strong>chat AI intégré</strong>. Focus français
+            (lycée/spécialités, notes sur 20).
+          </p>
+          <h3 class="mt-2 mb-1 text-sm font-semibold" node="[object Object]">
+            🏗️ Structure (22 tables)
+          </h3>
+          <pre
+            class="bg-muted rounded-md p-3 overflow-x-auto my-2 whitespace-pre-wrap break-all"
+          ><code class="bg-muted px-1 py-0.5 rounded text-sm break-all font-mono text-foreground" node="[object Object]">Core Business:
+├── users + user_* (limits, subs, prefs, dashboard) → Gestion SaaS complète
+├── workspaces → projects → pages (hiérarchie avec position/pin/archived)
+├── quizzes (énormes !) → templates → sequences → results (scores AI, forces/faiblesses)
+└── ai_conversations + ai_messages (tool_calls, thinking, credits tracking)
+
+Tech/Logs:
+├── activity_logs + usage_records + openai_usage_log (audit parfait)
+├── yjs_documents/updates (collab realtime)
+├── daily_articles + updates (contenu frais)
+└── webhook_events (intégrations)
+</code></pre>
+          <h3 class="mt-2 mb-1 text-sm font-semibold" node="[object Object]">
+            ✅ Points forts
+          </h3>
+          <ul class="my-1.5 pl-4 list-disc" node="[object Object]">
+            <li class="my-0.5" node="[object Object]">
+              <strong>SaaS-ready</strong> : Limits/quotas par ressource,
+              subscriptions (Clerk), resets périodiques
+            </li>
+            <li class="my-0.5" node="[object Object]">
+              <strong>AI-heavy</strong> : Messages riches
+              (thinking/tool_calls/sources), credits précises (tokens → coût →
+              limites)
+            </li>
+            <li class="my-0.5" node="[object Object]">
+              <strong>Éducatif poussé</strong> : Notes adaptées, analysis
+              (forces/faiblesses/temps), niveaux scolaires custom
+            </li>
+            <li class="my-0.5" node="[object Object]">
+              <strong>Collab</strong> : Workspace_members (roles/permissions),
+              Yjs pour realtime
+            </li>
+            <li class="my-0.5" node="[object Object]">
+              <strong>Audit total</strong> : Logs partout
+              (activity/usage/openai)
+            </li>
+          </ul>
+          <h3 class="mt-2 mb-1 text-sm font-semibold" node="[object Object]">
+            ⚠️ Problèmes détectés
+          </h3>
+          <div class="my-2 w-full overflow-y-auto">
+            <table
+              class="w-full border-collapse border border-border text-sm"
+              node="[object Object]"
+            >
+              <thead class="bg-muted" node="[object Object]">
+                <tr
+                  class="border-b border-border last:border-0"
+                  node="[object Object]"
+                >
+                  <th
+                    class="px-3 py-1.5 text-left font-medium text-muted-foreground border-r border-border last:border-0"
+                    node="[object Object]"
+                  >
+                    Issue
+                  </th>
+                  <th
+                    class="px-3 py-1.5 text-left font-medium text-muted-foreground border-r border-border last:border-0"
+                    node="[object Object]"
+                  >
+                    Détail
+                  </th>
+                  <th
+                    class="px-3 py-1.5 text-left font-medium text-muted-foreground border-r border-border last:border-0"
+                    node="[object Object]"
+                  >
+                    Impact
+                  </th>
+                </tr>
+              </thead>
+              <tbody class="" node="[object Object]">
+                <tr
+                  class="border-b border-border last:border-0"
+                  node="[object Object]"
+                >
+                  <td
+                    class="px-3 py-1.5 border-r border-border last:border-0"
+                    node="[object Object]"
+                  >
+                    <strong>Pas de PKs explicites</strong>
+                  </td>
+                  <td
+                    class="px-3 py-1.5 border-r border-border last:border-0"
+                    node="[object Object]"
+                  >
+                    Tous
+                    <code
+                      class="bg-muted px-1 py-0.5 rounded text-sm break-all font-mono text-foreground"
+                      node="[object Object]"
+                      >isPrimaryKey: false</code
+                    >
+                    ?! UUIDs en fin de colonnes = PKs implicites ?
+                  </td>
+                  <td
+                    class="px-3 py-1.5 border-r border-border last:border-0"
+                    node="[object Object]"
+                  >
+                    Queries lentes sans indexes PK
+                  </td>
+                </tr>
+                <tr
+                  class="border-b border-border last:border-0"
+                  node="[object Object]"
+                >
+                  <td
+                    class="px-3 py-1.5 border-r border-border last:border-0"
+                    node="[object Object]"
+                  >
+                    <strong>Types USER-DEFINED</strong>
+                  </td>
+                  <td
+                    class="px-3 py-1.5 border-r border-border last:border-0"
+                    node="[object Object]"
+                  >
+                    <code
+                      class="bg-muted px-1 py-0.5 rounded text-sm break-all font-mono text-foreground"
+                      node="[object Object]"
+                      >role</code
+                    >,
+                    <code
+                      class="bg-muted px-1 py-0.5 rounded text-sm break-all font-mono text-foreground"
+                      node="[object Object]"
+                      >school_level</code
+                    >,
+                    <code
+                      class="bg-muted px-1 py-0.5 rounded text-sm break-all font-mono text-foreground"
+                      node="[object Object]"
+                      >preset</code
+                    >, etc. sans enums listés
+                  </td>
+                  <td
+                    class="px-3 py-1.5 border-r border-border last:border-0"
+                    node="[object Object]"
+                  >
+                    Schema incomplet, migrations risquées
+                  </td>
+                </tr>
+                <tr
+                  class="border-b border-border last:border-0"
+                  node="[object Object]"
+                >
+                  <td
+                    class="px-3 py-1.5 border-r border-border last:border-0"
+                    node="[object Object]"
+                  >
+                    <strong>Yjs docs en TEXT</strong>
+                  </td>
+                  <td
+                    class="px-3 py-1.5 border-r border-border last:border-0"
+                    node="[object Object]"
+                  >
+                    <code
+                      class="bg-muted px-1 py-0.5 rounded text-sm break-all font-mono text-foreground"
+                      node="[object Object]"
+                      >id</code
+                    >
+                    text au lieu uuid
+                  </td>
+                  <td
+                    class="px-3 py-1.5 border-r border-border last:border-0"
+                    node="[object Object]"
+                  >
+                    Fragile pour refs FK
+                  </td>
+                </tr>
+                <tr
+                  class="border-b border-border last:border-0"
+                  node="[object Object]"
+                >
+                  <td
+                    class="px-3 py-1.5 border-r border-border last:border-0"
+                    node="[object Object]"
+                  >
+                    <strong>user_id mixte</strong>
+                  </td>
+                  <td
+                    class="px-3 py-1.5 border-r border-border last:border-0"
+                    node="[object Object]"
+                  >
+                    varchar(255) partout (Clerk IDs) ✅ mais vérifier indexes
+                  </td>
+                  <td
+                    class="px-3 py-1.5 border-r border-border last:border-0"
+                    node="[object Object]"
+                  >
+                    OK si consistant
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <h3 class="mt-2 mb-1 text-sm font-semibold" node="[object Object]">
+            📊 Stats rapides suggérées
+          </h3>
+          <pre
+            class="bg-muted rounded-md p-3 overflow-x-auto my-2 whitespace-pre-wrap break-all"
+          ><code class="language-sql break-all bg-transparent p-0 font-mono text-foreground" node="[object Object]">-- Utilisateurs actifs + croissance
+SELECT COUNT(*) as total_users, 
+       COUNT(*) FILTER (WHERE is_active) as active_users
+FROM users;
+
+-- Quizz par niveau (top performers)
+SELECT school_level, AVG(percentage) as avg_score, COUNT(*) as count
+FROM quizzes q JOIN quiz_results r ON q.id = r.quiz_id
+GROUP BY school_level ORDER BY avg_score DESC;
+</code></pre>
+          <h3 class="mt-2 mb-1 text-sm font-semibold" node="[object Object]">
+            🚀 Recommandations
+          </h3>
+          <ol class="my-1.5 pl-4 list-decimal" node="[object Object]">
+            <li class="my-0.5" node="[object Object]">
+              <strong>Ajouter PKs explicites</strong> + indexes composites :
+              <pre
+                class="bg-muted rounded-md p-3 overflow-x-auto my-2 whitespace-pre-wrap break-all"
+              ><code class="language-sql break-all bg-transparent p-0 font-mono text-foreground" node="[object Object]">CREATE INDEX CONCURRENTLY idx_pages_workspace_project ON pages(workspace_id, project_id);
+CREATE INDEX CONCURRENTLY idx_quiz_results_quiz_user ON quiz_results(quiz_id, user_id);
+</code></pre>
+            </li>
+            <li class="my-0.5" node="[object Object]">
+              <strong>Vérifier volumes</strong> :
+              <code
+                class="bg-muted px-1 py-0.5 rounded text-sm break-all font-mono text-foreground"
+                node="[object Object]"
+                >SELECT COUNT(*) FROM quizzes;</code
+              >
+              → si &gt;1M, partitionner
+            </li>
+            <li class="my-0.5" node="[object Object]">
+              <strong>Cleanup</strong> : Archiver
+              <code
+                class="bg-muted px-1 py-0.5 rounded text-sm break-all font-mono text-foreground"
+                node="[object Object]"
+                >is_archived=true</code
+              >
+              dans tables séparées
+            </li>
+            <li class="my-0.5" node="[object Object]">
+              <strong>Analytics</strong> : View pour user lifetime value (quizz
+              complétés × subscription tier)
+            </li>
+          </ol>
+          <p class="mb-2 last:mb-0" node="[object Object]">
+            <strong>T'en penses quoi ?</strong> DB de prod sérieuse, prête à
+            scaler. Besoin d'optim querie spécifique ?
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
