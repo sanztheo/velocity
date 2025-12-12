@@ -227,8 +227,11 @@ export function Sidebar() {
   }, [connectedId]);
 
   return (
-    <div className="flex h-full w-full flex-col bg-sidebar border-r border-sidebar-border">
-      <div className="h-12 w-full shrink-0" data-tauri-drag-region />
+    <div className="flex h-full w-full flex-col bg-sidebar border-r border-sidebar-border relative">
+      <div className="absolute top-0 left-0 w-full h-10 z-50 pointer-events-none">
+        <div className="w-full h-full pointer-events-auto" data-tauri-drag-region />
+      </div>
+      <div className="h-4 w-full shrink-0" />
       <div className="flex-1 min-h-0 overflow-hidden">
         {connectedConnection ? (
           <DatabaseView

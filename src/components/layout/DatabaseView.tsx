@@ -86,21 +86,21 @@ export function DatabaseView({
       {/* Tables, Views, Functions */}
       {/* Tables, Views, Functions */}
       <div className="flex-1 overflow-y-auto min-h-0">
-        <div className="p-2 space-y-4">
+        <div className="p-2 space-y-2">
           {/* Tables Section */}
           {tables.length > 0 && (
-            <div className="space-y-1">
-              <div className="px-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            <div className="space-y-0.5">
+              <div className="px-2 pb-1 text-xs font-medium text-muted-foreground uppercase tracking-wide">
                 Tables ({tables.length})
               </div>
               {tables.map((table) => (
                 <button
                   key={table}
-                  className="flex items-center gap-2 w-full text-left text-sm px-2 py-1.5 rounded hover:bg-sidebar-hover transition-colors"
+                  className="flex items-center gap-2 w-full text-left text-sm px-2 py-1 rounded-sm hover:bg-sidebar-hover transition-colors group"
                   onClick={() => onTableClick(table)}
                 >
-                  <Table className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                  <span className="truncate">{table}</span>
+                  <Table className="h-4 w-4 text-muted-foreground shrink-0 group-hover:text-foreground transition-colors" />
+                  <span className="truncate text-muted-foreground group-hover:text-foreground transition-colors">{table}</span>
                 </button>
               ))}
             </div>
@@ -108,18 +108,18 @@ export function DatabaseView({
 
           {/* Views Section */}
           {views.length > 0 && (
-            <div className="space-y-1">
-              <div className="px-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            <div className="space-y-0.5">
+              <div className="px-2 pb-1 text-xs font-medium text-muted-foreground uppercase tracking-wide">
                 Views ({views.length})
               </div>
               {views.map((view) => (
                 <button
                   key={view}
-                  className="flex items-center gap-2 w-full text-left text-sm px-2 py-1.5 rounded hover:bg-sidebar-hover transition-colors"
+                  className="flex items-center gap-2 w-full text-left text-sm px-2 py-1 rounded-sm hover:bg-sidebar-hover transition-colors group"
                   onClick={() => onTableClick(view)}
                 >
-                  <Eye className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                  <span className="truncate">{view}</span>
+                  <Eye className="h-4 w-4 text-muted-foreground shrink-0 group-hover:text-foreground transition-colors" />
+                  <span className="truncate text-muted-foreground group-hover:text-foreground transition-colors">{view}</span>
                 </button>
               ))}
             </div>
@@ -127,16 +127,16 @@ export function DatabaseView({
 
           {/* Functions Section */}
           {functions.length > 0 && (
-            <div className="space-y-1">
-              <div className="px-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            <div className="space-y-0.5">
+              <div className="px-2 pb-1 text-xs font-medium text-muted-foreground uppercase tracking-wide">
                 Functions ({functions.length})
               </div>
               {functions.map((fn) => (
                 <div
                   key={fn}
-                  className="flex items-center gap-2 text-sm px-2 py-1.5 text-muted-foreground"
+                  className="flex items-center gap-2 text-sm px-2 py-1 text-muted-foreground"
                 >
-                  <FunctionSquare className="h-3.5 w-3.5 shrink-0" />
+                  <FunctionSquare className="h-4 w-4 shrink-0" />
                   <span className="truncate">{fn}</span>
                 </div>
               ))}
