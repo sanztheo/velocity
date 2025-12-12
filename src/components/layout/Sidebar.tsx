@@ -27,10 +27,10 @@ interface ConnectionState {
 export function Sidebar() {
   useConnections();
   
-  const { connections, setActiveConnection, addTab } = useAppStore();
+  const { connections, setActiveConnection, addTab, activeConnectionId } = useAppStore();
   
   // Single connected connection
-  const [connectedId, setConnectedId] = useState<string | null>(null);
+  const [connectedId, setConnectedId] = useState<string | null>(activeConnectionId);
   const [connectingId, setConnectingId] = useState<string | null>(null);
   const [connectionData, setConnectionData] = useState<ConnectionState>({ tables: [], views: [], functions: [] });
   
@@ -42,6 +42,39 @@ export function Sidebar() {
   const [connectionToDelete, setConnectionToDelete] = useState<Connection | null>(null);
 
   const connectedConnection = connectedId ? connections.find(c => c.id === connectedId) : null;
+
+  // Sync with store active connection
+  useEffect(() => {
+    setConnectedId(activeConnectionId);
+  }, [activeConnectionId]);
+
+  // Auto-fetch data if connected but data is missing
+  useEffect(() => {
+    if (connectedId && connectionData.tables.length === 0) {
+      const fetchData = async () => {
+        try {
+          // Check if actually connected first? 
+          // Assuming activeConnectionId implies we should be connected.
+          // But purely local state 'connectedId' might need re-validation.
+          
+          const results = await Promise.allSettled([
+            listTables(connectedId, 100, 0),
+            listViews(connectedId).catch(() => []),
+            listFunctions(connectedId).catch(() => []),
+          ]);
+          
+          const tables = results[0].status === 'fulfilled' ? results[0].value : [];
+          const views = results[1].status === 'fulfilled' ? results[1].value : [];
+          const functions = results[2].status === 'fulfilled' ? results[2].value : [];
+          
+          setConnectionData({ tables, views, functions });
+        } catch (e) {
+            // silent fail
+        }
+      };
+      fetchData();
+    }
+  }, [connectedId, connectionData.tables.length]);
 
   const handleConnect = async (conn: Connection) => {
     // If already connected to this one, do nothing
@@ -87,6 +120,7 @@ export function Sidebar() {
   const handleDisconnect = async () => {
     if (!connectedId) return;
     
+    // We don't need to find conn just for the name if we are careful
     const conn = connections.find(c => c.id === connectedId);
     try {
       await disconnectFromDatabase(connectedId);
