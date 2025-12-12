@@ -58,14 +58,18 @@ export function ChatPanel({ connectionId }: ChatPanelProps) {
   const handleSubmit = async () => {
     if (!agent.input.trim()) return;
     const input = agent.input;
+    const currentMentions = [...mentions.mentions]; // Capture current mentions
+    const hasWeb = mentions.hasWebMention;
+
+    // Clear input and mentions immediately for better UI responsiveness
     agent.setInput('');
-    // Pass mentions to append for context injection
+    mentions.clearMentions();
+
+    // Pass captured mentions to append for context injection
     await agent.append({ 
       role: 'user', 
       content: input,
-    }, mentions.mentions, mentions.hasWebMention);
-    // Clear mentions after submit
-    mentions.clearMentions();
+    }, currentMentions, hasWeb);
   };
 
   // No provider configured
