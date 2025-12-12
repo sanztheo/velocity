@@ -103,7 +103,7 @@ export function ChatPanel({ connectionId }: ChatPanelProps) {
       {/* Messages */}
       <ScrollArea className="flex-1 min-h-0 px-4" ref={scrollRef}>
         {agent.messages.length === 0 ? (
-          <EmptyState />
+          <EmptyState onSuggestionClick={agent.setInput} />
         ) : (
           agent.messages.map((message) => (
             <MessageBubble 
@@ -176,7 +176,7 @@ function ChatHeader({ provider, onClose }: ChatHeaderProps) {
 }
 
 // Empty state sub-component
-function EmptyState() {
+function EmptyState({ onSuggestionClick }: { onSuggestionClick: (text: string) => void }) {
   return (
     <div className="p-6 text-center">
       <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-purple-500/20 flex items-center justify-center">
@@ -186,11 +186,26 @@ function EmptyState() {
       <p className="text-sm text-muted-foreground mb-4">
         I can analyze your database schema, write SQL queries, and help optimize performance.
       </p>
-      <div className="text-xs text-muted-foreground space-y-1">
+      <div className="text-xs text-muted-foreground space-y-2 flex flex-col items-center">
         <p>Try asking:</p>
-        <p className="font-mono bg-muted rounded px-2 py-1 inline-block">"What tables are in this database?"</p>
-        <p className="font-mono bg-muted rounded px-2 py-1 inline-block">"Show me the schema for users table"</p>
-        <p className="font-mono bg-muted rounded px-2 py-1 inline-block">"Write a query to find inactive users"</p>
+        <button 
+          onClick={() => onSuggestionClick("What tables are in this database?")}
+          className="font-mono bg-muted rounded px-2 py-1 inline-block hover:bg-muted/80 cursor-pointer transition-colors"
+        >
+          What tables are in this database?
+        </button>
+        <button 
+          onClick={() => onSuggestionClick("Show me the schema for users table")}
+          className="font-mono bg-muted rounded px-2 py-1 inline-block hover:bg-muted/80 cursor-pointer transition-colors"
+        >
+          Show me the schema for users table
+        </button>
+        <button 
+          onClick={() => onSuggestionClick("Write a query to find inactive users")}
+          className="font-mono bg-muted rounded px-2 py-1 inline-block hover:bg-muted/80 cursor-pointer transition-colors"
+        >
+          Write a query to find inactive users
+        </button>
       </div>
     </div>
   );
