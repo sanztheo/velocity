@@ -221,6 +221,7 @@ export function Sidebar() {
 
   return (
     <div className="flex h-full w-full flex-col bg-sidebar border-r border-sidebar-border">
+      <div className="h-12 w-full shrink-0" data-tauri-drag-region />
       {/* Show DatabaseView when connected, ConnectionListView otherwise */}
       {connectedConnection ? (
         <DatabaseView

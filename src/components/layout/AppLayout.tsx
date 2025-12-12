@@ -79,6 +79,7 @@ export function AppLayout({
           
           <ResizablePanel defaultSize={rightPanelOpen ? (100 - 20 - rightPanelSize) : 80}>
             <div className="flex flex-col h-full w-full bg-background">
+              <div className="h-12 w-full shrink-0 bg-background border-b" data-tauri-drag-region />
               <TabBar />
               <main className="flex-1 overflow-auto">
                 {children}

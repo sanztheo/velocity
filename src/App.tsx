@@ -62,6 +62,7 @@ function App() {
         ) : (
           <div className="flex h-full items-center justify-center">
             <div className="text-center">
+              <img src="/icon.png" alt="Velocity" className="w-80 h-80 mx-auto mb-6 opacity-25" />
               <h2 className="text-xl font-semibold mb-2 text-foreground">Welcome to Velocity</h2>
               <p className="text-muted-foreground">
                 Press <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">⌘K</kbd> to search, or double-click a connection
