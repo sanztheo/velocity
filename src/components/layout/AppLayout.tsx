@@ -9,6 +9,8 @@ import { ImperativePanelHandle } from "react-resizable-panels";
 import { Sidebar } from "./Sidebar";
 import { TabBar } from "./TabBar";
 import { useAppStore } from "@/stores/app.store";
+import { Button } from "@/components/ui/button";
+import { Bot } from "lucide-react";
 
 export function AppLayout({ 
   children,
@@ -21,7 +23,7 @@ export function AppLayout({
   rightPanelOpen?: boolean;
   rightPanelSize?: number;
 }) {
-  const { sidebarCollapsed, toggleSidebar } = useAppStore();
+  const { sidebarCollapsed, toggleSidebar, activeConnectionId, setAiPanelOpen } = useAppStore();
   const sidebarRef = useRef<ImperativePanelHandle>(null);
 
   useEffect(() => {
@@ -79,7 +81,18 @@ export function AppLayout({
           
           <ResizablePanel defaultSize={rightPanelOpen ? (100 - 20 - rightPanelSize) : 80}>
             <div className="flex flex-col h-full w-full bg-background">
-              <div className="h-12 w-full shrink-0 bg-background border-b" data-tauri-drag-region />
+              <div className="h-12 w-full shrink-0 bg-background border-b flex items-center justify-end pr-4" data-tauri-drag-region>
+                 <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setAiPanelOpen(true)}
+                  disabled={!activeConnectionId}
+                  className="gap-2"
+                >
+                  <Bot className="h-4 w-4" />
+                  <span className="hidden sm:inline">AI Assistant</span>
+                </Button>
+              </div>
               <TabBar />
               <main className="flex-1 overflow-auto">
                 {children}
