@@ -59,18 +59,28 @@ export function EnhancedTableViewer({ connectionId, tableName }: EnhancedTableVi
   // Table editor for changes
   const editor = useTableEditor(primaryKeyColumn);
 
-  // Column widths
+  // Column widths (based on data type and name length)
   const columnWidths = useMemo(() => {
-    return schema.map(col => {
-      const type = col.dataType.toLowerCase();
-      if (type.includes('text') || type.includes('varchar')) return 200;
-      if (type.includes('uuid')) return 280;
-      if (type.includes('timestamp')) return 180;
-      if (type.includes('bool')) return 80;
-      if (type.includes('int') || type.includes('numeric')) return 100;
-      return 150;
+    // Ensure we map widths to the actual displayed columns order
+    const targetColumns = columns.length > 0 ? columns : schema.map(c => c.name);
+    
+    return targetColumns.map(colName => {
+      const col = schema.find(c => c.name === colName);
+      const type = col?.dataType.toLowerCase() || 'text';
+      
+      let width = 150; // default
+      
+      if (type.includes('text') || type.includes('varchar')) width = 200;
+      else if (type.includes('uuid')) width = 280;
+      else if (type.includes('timestamp')) width = 180;
+      else if (type.includes('bool')) width = 100;
+      else if (type.includes('int') || type.includes('numeric')) width = 120;
+      
+      // Ensure width is enough for column name (approx 11px per char + padding)
+      const nameWidth = (colName.length * 11) + 48; 
+      return Math.max(width, nameWidth);
     });
-  }, [schema]);
+  }, [schema, columns]);
 
   // Virtual rows
   const rowVirtualizer = useVirtualizer({
@@ -155,7 +165,7 @@ export function EnhancedTableViewer({ connectionId, tableName }: EnhancedTableVi
         })),
       ];
 
-      const result = await executeChanges(connectionId, tableName, changes, primaryKeyColumn);
+      const result = await executeChanges(connectionId, tableName, primaryKeyColumn, changes);
 
       if (result.success) {
         toast.success(`${result.rowsAffected} row(s) affected`);
@@ -363,6 +373,8 @@ export function EnhancedTableViewer({ connectionId, tableName }: EnhancedTableVi
                         isEditing={isEditing}
                         isModified={!!change}
                         isDeleted={isDeleted}
+                        connectionId={connectionId}
+                        tableName={tableName}
                         onStartEdit={() => editor.startEditing(rowIndex, col)}
                         onSave={(newValue) => {
                           if (isNewRow) {
