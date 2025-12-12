@@ -285,14 +285,25 @@ pub async fn ai_chat_stream(
     // Build request payload (OpenAI/Grok format)
     let mut payload = if provider == "gemini" {
         // Gemini format
-        serde_json::json!({
+        let mut gemini_payload = serde_json::json!({
             "contents": request.messages.iter().map(|m| {
                 serde_json::json!({
                     "role": if m.role == "assistant" { "model" } else { "user" },
                     "parts": [{ "text": m.content }]
                 })
             }).collect::<Vec<_>>()
-        })
+        });
+
+        // Add Google Search tool if enabled
+        if request.enable_web_search.unwrap_or(false) {
+            if let Some(obj) = gemini_payload.as_object_mut() {
+                obj.insert("tools".to_string(), serde_json::json!([
+                    { "googleSearch": {} }
+                ]));
+            }
+        }
+        
+        gemini_payload
     } else {
         // OpenAI/Grok format with tools
         serde_json::json!({
@@ -459,8 +470,12 @@ pub async fn ai_chat_stream(
             if let Some(tools) = obj.get_mut("tools") {
                 if let Some(tools_arr) = tools.as_array_mut() {
                     tools_arr.push(serde_json::json!({
-                        "type": "web_search",
-                        "web_search": {}
+                        "type": "live_search",
+                        "sources": [
+                            { "type": "web" },
+                            { "type": "news" },
+                            { "type": "x" }
+                        ]
                     }));
                 }
             }
@@ -468,10 +483,17 @@ pub async fn ai_chat_stream(
     }
 
     let client = reqwest::Client::new();
-    let response = client
+    let mut request_builder = client
         .post(api_url)
-        .header("Authorization", format!("Bearer {}", api_key))
-        .header("Content-Type", "application/json")
+        .header("Content-Type", "application/json");
+
+    // Only add Bearer token for non-Gemini providers (OpenAI, Grok)
+    // Gemini uses key=... query parameter
+    if provider != "gemini" {
+        request_builder = request_builder.header("Authorization", format!("Bearer {}", api_key));
+    }
+
+    let response = request_builder
         .json(&payload)
         .send()
         .await
