@@ -67,7 +67,7 @@ export async function getTableForeignKeys(
   connectionId: string,
   tableName: string
 ): Promise<ForeignKeyInfo[]> {
-  return await invoke("get_table_foreign_keys", { connectionId, tableName });
+  return await invoke("get_table_foreign_keys", { id: connectionId, tableName });
 }
 
 export interface TableData {
@@ -76,7 +76,7 @@ export interface TableData {
 }
 
 export async function getTableSchema(connectionId: string, tableName: string): Promise<ColumnInfo[]> {
-  return await invoke("get_table_schema", { connectionId, tableName });
+  return await invoke("get_table_schema", { id: connectionId, tableName });
 }
 
 // Performance Store
@@ -90,7 +90,7 @@ export async function getTableData(
 ): Promise<TableData> {
   const start = performance.now();
   try {
-    const result = await invoke<TableData>("get_table_data", { connectionId, tableName, limit, offset });
+    const result = await invoke<TableData>("get_table_data", { id: connectionId, tableName, limit, offset });
     const duration = performance.now() - start;
     usePerformanceStore.getState().recordQuery(duration, result.rows.length);
     return result;
@@ -128,7 +128,7 @@ export async function getTableDataFiltered(
 ): Promise<TableDataResponse> {
   const start = performance.now();
   try {
-    const result = await invoke<TableDataResponse>("get_table_data_filtered", { connectionId, tableName, options });
+    const result = await invoke<TableDataResponse>("get_table_data_filtered", { id: connectionId, tableName, options });
     const duration = performance.now() - start;
     usePerformanceStore.getState().recordQuery(duration, result.rows.length);
     return result;
@@ -154,36 +154,29 @@ export interface ExecuteResult {
   errors: string[];
 }
 
+// Execute pending changes (INSERT, UPDATE, DELETE)
 export async function executeChanges(
   connectionId: string,
   tableName: string,
-  changes: PendingChange[],
-  primaryKeyColumn: string
+  primaryKeyColumn: string,
+  changes: PendingChange[]
 ): Promise<ExecuteResult> {
-  return await invoke("execute_changes", { 
-    connectionId, 
-    tableName, 
-    changes, 
-    primaryKeyColumn 
-  });
+  return await invoke("execute_changes", { id: connectionId, tableName, primaryKeyColumn, changes });
 }
 
-// Query execution for SQL Editor
-export interface QueryResultData {
+export interface QueryResult {
   columns: string[];
   rows: unknown[][];
-  rowCount: number;
+  row_count: number;
 }
 
-export async function executeQuery(
-  connectionId: string,
-  sql: string
-): Promise<QueryResultData> {
+export async function executeQuery(connectionId: string, sql: string): Promise<QueryResult> {
   const start = performance.now();
   try {
-    const result = await invoke<QueryResultData>("execute_query", { connectionId, sql });
+    // The backend returns QueryResultData which matches our QueryResult interface
+    const result = await invoke<QueryResult>("execute_query", { id: connectionId, sql });
     const duration = performance.now() - start;
-    usePerformanceStore.getState().recordQuery(duration, result.rowCount);
+    usePerformanceStore.getState().recordQuery(duration, result.row_count);
     return result;
   } catch (error) {
     const duration = performance.now() - start;
@@ -196,11 +189,8 @@ export interface ExplainResult {
   plan: string[];
 }
 
-export async function explainQuery(
-  connectionId: string,
-  sql: string
-): Promise<ExplainResult> {
-  return await invoke("explain_query", { connectionId, sql });
+export async function explainQuery(connectionId: string, sql: string): Promise<ExplainResult> {
+  return await invoke("explain_query", { id: connectionId, sql });
 }
 
 // AI-powered SQL completion
@@ -225,15 +215,27 @@ export async function aiSqlComplete(
 // Structure Management / DDL Bindings
 // ============================================================================
 
+// Schema Ops
+export interface CreateTableRequest {
+  tableName: string;
+  columns: {
+    name: string;
+    dataType: string;
+    isNullable: boolean;
+    isPrimaryKey: boolean;
+    defaultValue?: string;
+  }[];
+}
+
 import { 
   ColumnDefinition, 
-  CreateTableRequest, 
   IndexInfo, 
   ForeignKeyDefinition 
 } from "@/features/structure-editor/types";
 
 // Re-export types for convenience
-export type { ColumnDefinition, CreateTableRequest, IndexInfo, ForeignKeyDefinition };
+// Re-export types for convenience
+export type { ColumnDefinition, IndexInfo, ForeignKeyDefinition };
 
 export async function previewCreateTable(
   connectionId: string, 
@@ -246,7 +248,7 @@ export async function executeDdl(
   connectionId: string, 
   sql: string
 ): Promise<void> {
-  return await invoke("execute_ddl", { connectionId, sql });
+  return await invoke("execute_ddl", { id: connectionId, sql });
 }
 
 export async function previewAddColumn(
@@ -254,7 +256,7 @@ export async function previewAddColumn(
   tableName: string,
   column: ColumnDefinition
 ): Promise<string> {
-  return await invoke("preview_add_column", { connectionId, tableName, column });
+  return await invoke("preview_add_column", { id: connectionId, tableName, column });
 }
 
 export async function previewDropColumn(
@@ -262,7 +264,7 @@ export async function previewDropColumn(
   tableName: string,
   columnName: string
 ): Promise<string> {
-  return await invoke("preview_drop_column", { connectionId, tableName, columnName });
+  return await invoke("preview_drop_column", { id: connectionId, tableName, columnName });
 }
 
 export async function previewModifyColumn(
@@ -272,7 +274,7 @@ export async function previewModifyColumn(
   newColumn: ColumnDefinition
 ): Promise<string> {
   return await invoke("preview_modify_column", { 
-    connectionId, 
+    id: connectionId, 
     tableName, 
     oldColumnName, 
     newColumn 
@@ -284,7 +286,7 @@ export async function previewCreateIndex(
   tableName: string,
   index: IndexInfo
 ): Promise<string> {
-  return await invoke("preview_create_index", { connectionId, tableName, index });
+  return await invoke("preview_create_index", { id: connectionId, tableName, index });
 }
 
 export async function previewDropIndex(
@@ -292,7 +294,7 @@ export async function previewDropIndex(
   tableName: string,
   indexName: string
 ): Promise<string> {
-  return await invoke("preview_drop_index", { connectionId, tableName, indexName });
+  return await invoke("preview_drop_index", { id: connectionId, tableName, indexName });
 }
 
 export async function previewAddForeignKey(
@@ -300,7 +302,7 @@ export async function previewAddForeignKey(
   tableName: string,
   fk: ForeignKeyDefinition
 ): Promise<string> {
-  return await invoke("preview_add_foreign_key", { connectionId, tableName, fk });
+  return await invoke("preview_add_foreign_key", { id: connectionId, tableName, fk });
 }
 
 export async function previewDropConstraint(
@@ -308,14 +310,14 @@ export async function previewDropConstraint(
   tableName: string,
   constraintName: string
 ): Promise<string> {
-  return await invoke("preview_drop_constraint", { connectionId, tableName, constraintName });
+  return await invoke("preview_drop_constraint", { id: connectionId, tableName, constraintName });
 }
 
 export async function getTableIndexes(
   connectionId: string,
   tableName: string
 ): Promise<IndexInfo[]> {
-  return await invoke("get_table_indexes", { connectionId, tableName });
+  return await invoke("get_table_indexes", { id: connectionId, tableName });
 }
 
 // Export/Import Commands

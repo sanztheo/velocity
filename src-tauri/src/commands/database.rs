@@ -98,56 +98,56 @@ pub struct ForeignKeyInfo {
 /// Get table foreign keys
 #[tauri::command]
 pub async fn get_table_foreign_keys(
-    connection_id: String,
+    id: String,
     table_name: String,
     pool_manager: State<'_, Arc<ConnectionPoolManager>>,
 ) -> Result<Vec<ForeignKeyInfo>, VelocityError> {
     pool_manager
-        .get_table_foreign_keys(&connection_id, &table_name)
+        .get_table_foreign_keys(&id, &table_name)
         .await
 }
 
 /// Get table schema (columns)
 #[tauri::command]
 pub async fn get_table_schema(
-    connection_id: String,
+    id: String,
     table_name: String,
     pool_manager: State<'_, Arc<ConnectionPoolManager>>,
 ) -> Result<Vec<ColumnInfo>, VelocityError> {
     pool_manager
-        .get_table_schema(&connection_id, &table_name)
+        .get_table_schema(&id, &table_name)
         .await
 }
 
 /// Get table data with pagination
 #[tauri::command]
 pub async fn get_table_data(
-    connection_id: String,
+    id: String,
     table_name: String,
     limit: i32,
     offset: i32,
     pool_manager: State<'_, Arc<ConnectionPoolManager>>,
 ) -> Result<TableData, VelocityError> {
     pool_manager
-        .get_table_data(&connection_id, &table_name, limit, offset)
+        .get_table_data(&id, &table_name, limit, offset)
         .await
 }
 
 /// Get table data with filtering, sorting, and pagination
 #[tauri::command]
 pub async fn get_table_data_filtered(
-    connection_id: String,
+    id: String,
     table_name: String,
     options: QueryOptions,
     pool_manager: State<'_, Arc<ConnectionPoolManager>>,
 ) -> Result<TableDataResponse, VelocityError> {
     let pool = pool_manager
-        .get_pool(&connection_id)
+        .get_pool(&id)
         .await
         .ok_or_else(|| VelocityError::Connection("Not connected".to_string()))?;
 
     let columns = pool_manager
-        .get_table_schema(&connection_id, &table_name)
+        .get_table_schema(&id, &table_name)
         .await?;
 
     fetch_table_data(pool.as_ref(), &table_name, &columns, &options).await
@@ -177,14 +177,14 @@ pub struct ExecuteResult {
 /// Execute pending changes (INSERT, UPDATE, DELETE)
 #[tauri::command]
 pub async fn execute_changes(
-    connection_id: String,
+    id: String,
     table_name: String,
     changes: Vec<PendingChange>,
     primary_key_column: String,
     pool_manager: State<'_, Arc<ConnectionPoolManager>>,
 ) -> Result<ExecuteResult, VelocityError> {
     pool_manager
-        .execute_changes(&connection_id, &table_name, &primary_key_column, changes)
+        .execute_changes(&id, &table_name, &primary_key_column, changes)
         .await
 }
 
@@ -200,11 +200,11 @@ pub struct QueryResultData {
 /// Execute a raw SQL query
 #[tauri::command]
 pub async fn execute_query(
-    connection_id: String,
+    id: String,
     sql: String,
     pool_manager: State<'_, Arc<ConnectionPoolManager>>,
 ) -> Result<QueryResultData, VelocityError> {
-    pool_manager.execute_query(&connection_id, &sql).await
+    pool_manager.execute_query(&id, &sql).await
 }
 
 /// Get query execution plan (EXPLAIN)
@@ -216,11 +216,11 @@ pub struct ExplainResult {
 
 #[tauri::command]
 pub async fn explain_query(
-    connection_id: String,
+    id: String,
     sql: String,
     pool_manager: State<'_, Arc<ConnectionPoolManager>>,
 ) -> Result<ExplainResult, VelocityError> {
-    pool_manager.explain_query(&connection_id, &sql).await
+    pool_manager.explain_query(&id, &sql).await
 }
 
 // ============================================================================
@@ -244,13 +244,13 @@ pub struct SafeQueryResult {
 #[tauri::command]
 pub async fn execute_sql_safe(
     app_handle: tauri::AppHandle,
-    connection_id: String,
+    id: String,
     sql: String,
     pool_manager: State<'_, Arc<ConnectionPoolManager>>,
 ) -> Result<SafeQueryResult, VelocityError> {
     use tauri::Emitter;
 
-    let result = pool_manager.execute_query(&connection_id, &sql).await;
+    let result = pool_manager.execute_query(&id, &sql).await;
     
     // Check if we need to emit a schema change event (DDL / Mutations)
     if result.is_ok() {
@@ -261,7 +261,7 @@ pub async fn execute_sql_safe(
             || sql_upper.starts_with("TRUNCATE");
             
         if is_schema_change {
-            let _ = app_handle.emit("database:schema-changed", &connection_id);
+            let _ = app_handle.emit("database:schema-changed", &id);
         }
     }
 
@@ -387,12 +387,12 @@ use crate::db::schema_ops::{
 /// Preview SQL for creating a table (returns SQL without executing)
 #[tauri::command]
 pub async fn preview_create_table(
-    connection_id: String,
+    id: String,
     request: CreateTableRequest,
     pool_manager: State<'_, Arc<ConnectionPoolManager>>,
 ) -> Result<String, VelocityError> {
     let pool = pool_manager
-        .get_pool(&connection_id)
+        .get_pool(&id)
         .await
         .ok_or_else(|| VelocityError::Connection("Not connected".to_string()))?;
 
@@ -426,13 +426,13 @@ pub async fn execute_ddl(
 /// Preview SQL for adding a column
 #[tauri::command]
 pub async fn preview_add_column(
-    connection_id: String,
+    id: String,
     table_name: String,
     column: ColumnDefinition,
     pool_manager: State<'_, Arc<ConnectionPoolManager>>,
 ) -> Result<String, VelocityError> {
     let pool = pool_manager
-        .get_pool(&connection_id)
+        .get_pool(&id)
         .await
         .ok_or_else(|| VelocityError::Connection("Not connected".to_string()))?;
 
@@ -442,13 +442,13 @@ pub async fn preview_add_column(
 /// Preview SQL for dropping a column
 #[tauri::command]
 pub async fn preview_drop_column(
-    connection_id: String,
+    id: String,
     table_name: String,
     column_name: String,
     pool_manager: State<'_, Arc<ConnectionPoolManager>>,
 ) -> Result<String, VelocityError> {
     let pool = pool_manager
-        .get_pool(&connection_id)
+        .get_pool(&id)
         .await
         .ok_or_else(|| VelocityError::Connection("Not connected".to_string()))?;
 
@@ -458,14 +458,14 @@ pub async fn preview_drop_column(
 /// Preview SQL for modifying a column
 #[tauri::command]
 pub async fn preview_modify_column(
-    connection_id: String,
+    id: String,
     table_name: String,
     old_column_name: String,
     new_column: ColumnDefinition,
     pool_manager: State<'_, Arc<ConnectionPoolManager>>,
 ) -> Result<String, VelocityError> {
     let pool = pool_manager
-        .get_pool(&connection_id)
+        .get_pool(&id)
         .await
         .ok_or_else(|| VelocityError::Connection("Not connected".to_string()))?;
 
@@ -480,13 +480,13 @@ pub async fn preview_modify_column(
 /// Preview SQL for creating an index
 #[tauri::command]
 pub async fn preview_create_index(
-    connection_id: String,
+    id: String,
     table_name: String,
     index: IndexInfo,
     pool_manager: State<'_, Arc<ConnectionPoolManager>>,
 ) -> Result<String, VelocityError> {
     let pool = pool_manager
-        .get_pool(&connection_id)
+        .get_pool(&id)
         .await
         .ok_or_else(|| VelocityError::Connection("Not connected".to_string()))?;
 
@@ -496,13 +496,13 @@ pub async fn preview_create_index(
 /// Preview SQL for dropping an index
 #[tauri::command]
 pub async fn preview_drop_index(
-    connection_id: String,
+    id: String,
     table_name: String,
     index_name: String,
     pool_manager: State<'_, Arc<ConnectionPoolManager>>,
 ) -> Result<String, VelocityError> {
     let pool = pool_manager
-        .get_pool(&connection_id)
+        .get_pool(&id)
         .await
         .ok_or_else(|| VelocityError::Connection("Not connected".to_string()))?;
 
@@ -512,13 +512,13 @@ pub async fn preview_drop_index(
 /// Preview SQL for adding a foreign key
 #[tauri::command]
 pub async fn preview_add_foreign_key(
-    connection_id: String,
+    id: String,
     table_name: String,
     fk: ForeignKeyDefinition,
     pool_manager: State<'_, Arc<ConnectionPoolManager>>,
 ) -> Result<String, VelocityError> {
     let pool = pool_manager
-        .get_pool(&connection_id)
+        .get_pool(&id)
         .await
         .ok_or_else(|| VelocityError::Connection("Not connected".to_string()))?;
 
@@ -528,13 +528,13 @@ pub async fn preview_add_foreign_key(
 /// Preview SQL for dropping a constraint
 #[tauri::command]
 pub async fn preview_drop_constraint(
-    connection_id: String,
+    id: String,
     table_name: String,
     constraint_name: String,
     pool_manager: State<'_, Arc<ConnectionPoolManager>>,
 ) -> Result<String, VelocityError> {
     let pool = pool_manager
-        .get_pool(&connection_id)
+        .get_pool(&id)
         .await
         .ok_or_else(|| VelocityError::Connection("Not connected".to_string()))?;
 
@@ -544,12 +544,12 @@ pub async fn preview_drop_constraint(
 /// Get indexes for a table
 #[tauri::command]
 pub async fn get_table_indexes(
-    connection_id: String,
+    id: String,
     table_name: String,
     pool_manager: State<'_, Arc<ConnectionPoolManager>>,
 ) -> Result<Vec<IndexInfo>, VelocityError> {
     let pool = pool_manager
-        .get_pool(&connection_id)
+        .get_pool(&id)
         .await
         .ok_or_else(|| VelocityError::Connection("Not connected".to_string()))?;
 

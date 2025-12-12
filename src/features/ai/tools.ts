@@ -150,11 +150,11 @@ export async function executeDatabaseSchemaTool(connectionId: string): Promise<D
 }
 
 export async function executeSqlQueryTool(connectionId: string, sql: string): Promise<SafeQueryResult> {
-  return await invoke<SafeQueryResult>('execute_sql_safe', { connectionId, sql });
+  return await invoke<SafeQueryResult>('execute_sql_safe', { id: connectionId, sql });
 }
 
 export async function executeExplainTool(connectionId: string, sql: string): Promise<ExplainResult> {
-  return await invoke<ExplainResult>('explain_query', { connectionId, sql });
+  return await invoke<ExplainResult>('explain_query', { id: connectionId, sql });
 }
 
 export async function executeListTablesTool(connectionId: string): Promise<string[]> {
@@ -168,14 +168,14 @@ export async function executeGetTablePreviewTool(
 ): Promise<SafeQueryResult> {
   // Use safe SQL execution to preview table data
   const sql = `SELECT * FROM "${tableName}" LIMIT ${limit}`;
-  return await invoke<SafeQueryResult>('execute_sql_safe', { connectionId, sql });
+  return await invoke<SafeQueryResult>('execute_sql_safe', { id: connectionId, sql });
 }
 
 export async function executeGetTableSchemaTool(
   connectionId: string,
   tableName: string
 ): Promise<ColumnInfo[]> {
-  return await invoke<ColumnInfo[]>('get_table_schema', { connectionId, tableName });
+  return await invoke<ColumnInfo[]>('get_table_schema', { id: connectionId, tableName });
 }
 
 interface IndexInfo {
@@ -189,7 +189,7 @@ export async function executeGetTableIndexesTool(
   connectionId: string,
   tableName: string
 ): Promise<IndexInfo[]> {
-  return await invoke<IndexInfo[]>('get_table_indexes', { connectionId, tableName });
+  return await invoke<IndexInfo[]>('get_table_indexes', { id: connectionId, tableName });
 }
 
 interface ForeignKeyInfo {
@@ -203,7 +203,7 @@ export async function executeGetTableForeignKeysTool(
   connectionId: string,
   tableName: string
 ): Promise<ForeignKeyInfo[]> {
-  return await invoke<ForeignKeyInfo[]>('get_table_foreign_keys', { connectionId, tableName });
+  return await invoke<ForeignKeyInfo[]>('get_table_foreign_keys', { id: connectionId, tableName });
 }
 
 export async function executeValidateSqlTool(
@@ -212,7 +212,7 @@ export async function executeValidateSqlTool(
 ): Promise<{ valid: boolean; error?: string }> {
   // Use EXPLAIN to validate SQL syntax without executing
   try {
-    await invoke<ExplainResult>('explain_query', { connectionId, sql });
+    await invoke<ExplainResult>('explain_query', { id: connectionId, sql });
     return { valid: true };
   } catch (error) {
     return { 
@@ -245,7 +245,7 @@ export async function executeCreateTableTool(
   }).join(', ');
   
   const sql = `CREATE TABLE "${tableName}" (${columnDefs})`;
-  return await invoke<SafeQueryResult>('execute_sql_safe', { connectionId, sql });
+  return await invoke<SafeQueryResult>('execute_sql_safe', { id: connectionId, sql });
 }
 
 export async function executeGenerateInsertTemplateTool(
@@ -253,7 +253,7 @@ export async function executeGenerateInsertTemplateTool(
   tableName: string
 ): Promise<string> {
   // Get table schema
-  const columns = await invoke<ColumnInfo[]>('get_table_schema', { connectionId, tableName });
+  const columns = await invoke<ColumnInfo[]>('get_table_schema', { id: connectionId, tableName });
   
   const columnNames = columns.map(c => `"${c.name}"`).join(', ');
   const placeholders = columns.map(c => `<${c.name}:${c.dataType}>`).join(', ');
@@ -262,7 +262,7 @@ export async function executeGenerateInsertTemplateTool(
 }
 
 export async function executeDdlTool(connectionId: string, sql: string): Promise<SafeQueryResult> {
-  return await invoke<SafeQueryResult>('execute_sql_safe', { connectionId, sql });
+  return await invoke<SafeQueryResult>('execute_sql_safe', { id: connectionId, sql });
 }
 
 // =============================================================================

@@ -134,33 +134,33 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
           return await invoke('get_database_schema_full', { id: connectionId });
         
         case 'run_sql_query':
-          return await invoke('execute_query', { connectionId, sql: args.sql as string });
+          return await invoke('execute_query', { id: connectionId, sql: args.sql as string });
         
         case 'list_tables':
           return await invoke('list_tables', { id: connectionId });
         
         case 'get_table_schema':
-          return await invoke('get_table_schema', { connectionId, tableName: args.table_name as string });
+          return await invoke('get_table_schema', { id: connectionId, tableName: args.table_name as string });
         
         case 'execute_ddl':
-          return await invoke('execute_ddl', { connectionId, sql: args.sql as string });
+          return await invoke('execute_ddl', { id: connectionId, sql: args.sql as string });
         
         case 'explain_query':
-          return await invoke('explain_query', { connectionId, sql: args.sql as string });
+          return await invoke('explain_query', { id: connectionId, sql: args.sql as string });
         
         case 'get_table_preview':
           return await invoke('get_table_data', { 
-            connectionId, 
+            id: connectionId, 
             tableName: args.table_name as string,
             limit: (args.limit as number) || 10,
             offset: 0 
           });
         
         case 'get_table_indexes':
-          return await invoke('get_table_indexes', { connectionId, tableName: args.table_name as string });
+          return await invoke('get_table_indexes', { id: connectionId, tableName: args.table_name as string });
         
         case 'get_table_foreign_keys':
-          return await invoke('get_table_foreign_keys', { connectionId, tableName: args.table_name as string });
+          return await invoke('get_table_foreign_keys', { id: connectionId, tableName: args.table_name as string });
         
         default:
           return { error: `Unknown tool: ${toolName}` };
