@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ModeToggle } from "@/components/mode-toggle";
+
 import { listen } from "@tauri-apps/api/event"; // Added listen import
 import { useAppStore } from "@/stores/app.store";
 import { useConnections } from "@/hooks/useConnections";
@@ -18,6 +18,9 @@ import { CreateTableDialog } from "@/features/structure-editor";
 import { DeleteConnectionDialog } from "@/components/modals/DeleteConnectionDialog";
 import { ConnectionListView } from "./ConnectionListView";
 import { DatabaseView } from "./DatabaseView";
+import { Settings } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { SettingsDialog } from "@/components/settings/SettingsDialog";
 
 interface ConnectionState {
   tables: string[];
@@ -41,6 +44,7 @@ export function Sidebar() {
   const [createTableConnectionId, setCreateTableConnectionId] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [connectionToDelete, setConnectionToDelete] = useState<Connection | null>(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const connectedConnection = connectedId ? connections.find(c => c.id === connectedId) : null;
 
@@ -290,14 +294,22 @@ export function Sidebar() {
         onConfirm={handleConfirmDelete}
         connectionName={connectionToDelete?.name}
       />
-      {!connectedConnection && (
-        <div className="p-4 border-t border-sidebar-border mt-auto">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">Theme</span>
-            <ModeToggle />
-          </div>
+
+      <div className="p-4 border-t border-sidebar-border mt-auto">
+        <div className="flex items-center justify-between">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground"
+            onClick={() => setIsSettingsOpen(true)}
+          >
+            <Settings className="h-4 w-4" />
+            <span>Settings</span>
+          </Button>
         </div>
-      )}
+      </div>
+      
+      <SettingsDialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
     </div>
   );
 }

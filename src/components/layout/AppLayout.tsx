@@ -10,7 +10,7 @@ import { Sidebar } from "./Sidebar";
 import { TabBar } from "./TabBar";
 import { useAppStore } from "@/stores/app.store";
 import { Button } from "@/components/ui/button";
-import { Bot } from "lucide-react";
+
 
 export function AppLayout({ 
   children,
@@ -89,8 +89,8 @@ export function AppLayout({
                   disabled={!activeConnectionId}
                   className="gap-2"
                 >
-                  <Bot className="h-4 w-4" />
-                  <span className="hidden sm:inline">AI Assistant</span>
+                  <img src="/svg/velocity-ia.svg" className="h-6 w-6" alt="IA" />
+                  <span className="hidden sm:inline">IA Velocity</span>
                 </Button>
               </div>
               <TabBar />
