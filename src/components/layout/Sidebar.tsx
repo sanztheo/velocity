@@ -31,7 +31,7 @@ interface ConnectionState {
 export function Sidebar() {
   useConnections();
   
-  const { connections, setActiveConnection, addTab, activeConnectionId } = useAppStore();
+  const { connections, setActiveConnection, addTab, openTab, activeConnectionId } = useAppStore();
   
   // Single connected connection
   const [connectedId, setConnectedId] = useState<string | null>(activeConnectionId);
@@ -142,8 +142,7 @@ export function Sidebar() {
   const handleTableClick = (tableName: string) => {
     if (!connectedId || !connectedConnection) return;
     
-    addTab({
-      id: `table-${connectedId}-${tableName}-${Date.now()}`,
+    openTab({
       title: tableName,
       type: 'table',
       connectionId: connectedId,
@@ -226,39 +225,40 @@ export function Sidebar() {
   return (
     <div className="flex h-full w-full flex-col bg-sidebar border-r border-sidebar-border">
       <div className="h-12 w-full shrink-0" data-tauri-drag-region />
-      {/* Show DatabaseView when connected, ConnectionListView otherwise */}
-      {connectedConnection ? (
-        <DatabaseView
-          connection={connectedConnection}
-          tables={connectionData.tables}
-          views={connectionData.views}
-          functions={connectionData.functions}
-          onBack={handleDisconnect}
-          onTableClick={handleTableClick}
-          onNewQuery={handleNewQuery}
-          onNewTable={() => setCreateTableConnectionId(connectedId)}
-          onViewERD={() => {
-            if (!connectedId) return;
-            addTab({
-              id: `erd-${connectedId}`,
-              title: 'Relationship Diagram',
-              type: 'erd',
-              connectionId: connectedId,
-            });
-          }}
-          onEdit={() => handleEdit(connectedConnection)}
-          onDelete={() => handleDeleteClick(connectedConnection)}
-        />
-      ) : (
-        <ConnectionListView
-          connections={connections}
-          connectingId={connectingId}
-          onConnect={handleConnect}
-          onEdit={handleEdit}
-          onDelete={handleDeleteClick}
-          onAddNew={() => setIsAddModalOpen(true)}
-        />
-      )}
+      <div className="flex-1 min-h-0 overflow-hidden">
+        {connectedConnection ? (
+          <DatabaseView
+            connection={connectedConnection}
+            tables={connectionData.tables}
+            views={connectionData.views}
+            functions={connectionData.functions}
+            onBack={handleDisconnect}
+            onTableClick={handleTableClick}
+            onNewQuery={handleNewQuery}
+            onNewTable={() => setCreateTableConnectionId(connectedId)}
+            onViewERD={() => {
+              if (!connectedId) return;
+              addTab({
+                id: `erd-${connectedId}`,
+                title: 'Relationship Diagram',
+                type: 'erd',
+                connectionId: connectedId,
+              });
+            }}
+            onEdit={() => handleEdit(connectedConnection)}
+            onDelete={() => handleDeleteClick(connectedConnection)}
+          />
+        ) : (
+          <ConnectionListView
+            connections={connections}
+            connectingId={connectingId}
+            onConnect={handleConnect}
+            onEdit={handleEdit}
+            onDelete={handleDeleteClick}
+            onAddNew={() => setIsAddModalOpen(true)}
+          />
+        )}
+      </div>
 
       {/* Add/Edit Connection Modal */}
       <Dialog open={isAddModalOpen} onOpenChange={(open) => !open && handleModalClose()}>
@@ -295,7 +295,7 @@ export function Sidebar() {
         connectionName={connectionToDelete?.name}
       />
 
-      <div className="p-4 border-t border-sidebar-border mt-auto">
+      <div className="py-2 px-2 rounded-xl mt-auto">
         <div className="flex items-center justify-between">
           <Button 
             variant="ghost" 

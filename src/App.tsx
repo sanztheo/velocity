@@ -74,7 +74,7 @@ function App() {
       
       <SpotlightSearch />
       <PerformanceMonitor />
-      <Toaster position="top-right" />
+      <Toaster position="top-right" duration={1500} />
     </>
   );
 }
