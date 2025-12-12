@@ -97,6 +97,7 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
     step: number;
     maxSteps: number;
     pendingToolCalls: { id: string; name: string; args: Record<string, unknown> }[];
+    approvedToolIds: string[]; // Track IDs that were approved in this step
   } | null>(null);
 
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -176,11 +177,13 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
     startStep: number,
     maxSteps: number,
     initialPendingToolCalls: { id: string; name: string; args: Record<string, unknown> }[] = [],
-    enableWebSearch: boolean = false
+    enableWebSearch: boolean = false,
+    initialApprovedToolIds: string[] = [] // Whitelist of already approved tool IDs
   ) => {
     let step = startStep;
     let apiMessages = [...initialApiMessages];
     let currentPendingToolCalls = [...initialPendingToolCalls];
+    let approvedToolIds = [...initialApprovedToolIds]; // Track locally for this run
     let continueLoop = true;
 
     try {
@@ -189,123 +192,142 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
         if (currentPendingToolCalls.length > 0) {
           console.log(`[Step ${step}] Processing ${currentPendingToolCalls.length} tool calls`);
           
-          // Check for destructive commands first
-          const destructiveCall = currentPendingToolCalls.find(tc => 
-             isDestructive(tc.name, tc.args)
-          );
+          // 1. Separate tools into executable (safe or approved) and blocked
+          const executableTools: typeof currentPendingToolCalls = [];
+          const blockedTools: typeof currentPendingToolCalls = [];
 
-          if (destructiveCall && !settings.autoAcceptSql) {
-            console.log('[Agent] Pausing for confirmation:', destructiveCall);
+          for (const tc of currentPendingToolCalls) {
+            const isBlocked = !settings.autoAcceptSql && 
+                              isDestructive(tc.name, tc.args) && 
+                              !approvedToolIds.includes(tc.id);
             
-            // Update UI status to awaiting-confirmation
-            setMessages(prev => {
-              const updated = [...prev];
-              const lastIdx = updated.length - 1;
-              if (lastIdx < 0) return prev;
-              
-              const lastMsg = { ...updated[lastIdx] };
-              const parts = [...(lastMsg.parts || [])];
-              const toolPartIdx = parts.findIndex(p => p.type === 'tool-invocation' && p.toolCallId === destructiveCall.id);
-              if (toolPartIdx >= 0) {
-                parts[toolPartIdx] = { ...parts[toolPartIdx], status: 'awaiting-confirmation' };
-              }
-              lastMsg.parts = parts;
-              updated[lastIdx] = lastMsg;
-              return updated;
-            });
-
-            // Save state to resume later
-            loopStateRef.current = {
-              apiMessages,
-              step,
-              maxSteps,
-              pendingToolCalls: currentPendingToolCalls
-            };
-            
-            setPendingConfirmation({
-              toolCallId: destructiveCall.id,
-              sql: destructiveCall.args.sql as string || 'Destructive Operation',
-              isMutation: true,
-            });
-            
-            setIsLoading(false); // Stop loading indicator while waiting
-            return; // EXIT LOOP to wait for user
+            if (isBlocked) {
+              blockedTools.push(tc);
+            } else {
+              executableTools.push(tc);
+            }
           }
 
-          // Execute all tools
-          const toolResults: { tool_call_id: string; role: 'tool'; content: string }[] = [];
+          // 2. If we have executable tools, run them IMMEDIATELY
+          if (executableTools.length > 0) {
+            const toolResults: { tool_call_id: string; role: 'tool'; content: string }[] = [];
+            
+            for (const toolCall of executableTools) {
+              // Update UI status to executing
+              setMessages(prev => {
+                const updated = [...prev];
+                const lastIdx = updated.length - 1;
+                if (lastIdx < 0) return prev;
+                
+                const lastMsg = { ...updated[lastIdx] };
+                const parts = [...(lastMsg.parts || [])];
+                const toolPartIdx = parts.findIndex(p => p.type === 'tool-invocation' && p.toolCallId === toolCall.id);
+                if (toolPartIdx >= 0) {
+                  parts[toolPartIdx] = { ...parts[toolPartIdx], status: 'executing' };
+                }
+                lastMsg.parts = parts;
+                updated[lastIdx] = lastMsg;
+                return updated;
+              });
+
+              // Execute
+              const result = await executeTool(toolCall.name, toolCall.args);
+              
+              toolResults.push({
+                tool_call_id: toolCall.id,
+                role: 'tool',
+                content: JSON.stringify(result),
+              });
+
+              // Update UI with result
+              setMessages(prev => {
+                const updated = [...prev];
+                const lastIdx = updated.length - 1;
+                if (lastIdx < 0) return prev;
+                
+                const lastMsg = { ...updated[lastIdx] };
+                const parts = [...(lastMsg.parts || [])];
+                const toolPartIdx = parts.findIndex(p => p.type === 'tool-invocation' && p.toolCallId === toolCall.id);
+                if (toolPartIdx >= 0) {
+                  parts[toolPartIdx] = { 
+                    ...parts[toolPartIdx], 
+                    status: 'success',
+                    result,
+                  };
+                }
+                lastMsg.parts = parts;
+                updated[lastIdx] = lastMsg;
+                return updated;
+              });
+            }
+
+            // Add results to history
+            for (const tr of toolResults) {
+              apiMessages.push({
+                role: 'tool',
+                content: tr.content,
+                toolCallId: tr.tool_call_id
+              });
+            }
+
+            // Update currentPendingToolCalls to only contain blocked tools for next pass
+            currentPendingToolCalls = blockedTools;
+            
+            // If we executed something, loop back immediately to check if we have blocked tools left
+            // effectively "refreshing" the state for the next check
+            continue;
+          }
+
+          // 3. If we are here, we ONLY have blocked tools (or empty list if everything was executed)
+          if (blockedTools.length > 0) {
+             const destructiveCall = blockedTools[0]; // Take the first one
+             console.log('[Agent] Pausing for confirmation:', destructiveCall);
+            
+             // Update UI status to awaiting-confirmation
+             setMessages(prev => {
+               const updated = [...prev];
+               const lastIdx = updated.length - 1;
+               if (lastIdx < 0) return prev;
+               
+               const lastMsg = { ...updated[lastIdx] };
+               const parts = [...(lastMsg.parts || [])];
+               const toolPartIdx = parts.findIndex(p => p.type === 'tool-invocation' && p.toolCallId === destructiveCall.id);
+               if (toolPartIdx >= 0) {
+                 parts[toolPartIdx] = { ...parts[toolPartIdx], status: 'awaiting-confirmation' };
+               }
+               lastMsg.parts = parts;
+               updated[lastIdx] = lastMsg;
+               return updated;
+             });
+
+             // Save state to resume later
+             // IMPORTANT: We save `blockedTools` as the pending ones, so when we resume, we only process them
+             loopStateRef.current = {
+               apiMessages,
+               step,
+               maxSteps,
+               pendingToolCalls: blockedTools,
+               approvedToolIds
+             };
+             
+             setPendingConfirmation({
+               toolCallId: destructiveCall.id,
+               sql: destructiveCall.args.sql as string || 'Destructive Operation',
+               isMutation: true,
+             });
+             
+             setIsLoading(false); 
+             return; // EXIT LOOP
+          }
           
-          for (const toolCall of currentPendingToolCalls) {
-            // Update UI status to executing
-            setMessages(prev => {
-              const updated = [...prev];
-              const lastIdx = updated.length - 1;
-              if (lastIdx < 0) return prev;
-              
-              const lastMsg = { ...updated[lastIdx] };
-              const parts = [...(lastMsg.parts || [])];
-              const toolPartIdx = parts.findIndex(p => p.type === 'tool-invocation' && p.toolCallId === toolCall.id);
-              if (toolPartIdx >= 0) {
-                parts[toolPartIdx] = { ...parts[toolPartIdx], status: 'executing' };
-              }
-              lastMsg.parts = parts;
-              updated[lastIdx] = lastMsg;
-              return updated;
-            });
-
-            // Execute
-            const result = await executeTool(toolCall.name, toolCall.args);
-            
-            toolResults.push({
-              tool_call_id: toolCall.id,
-              role: 'tool',
-              content: JSON.stringify(result),
-            });
-
-            // Update UI with result
-            setMessages(prev => {
-              const updated = [...prev];
-              const lastIdx = updated.length - 1;
-              if (lastIdx < 0) return prev;
-              
-              const lastMsg = { ...updated[lastIdx] };
-              const parts = [...(lastMsg.parts || [])];
-              const toolPartIdx = parts.findIndex(p => p.type === 'tool-invocation' && p.toolCallId === toolCall.id);
-              if (toolPartIdx >= 0) {
-                parts[toolPartIdx] = { 
-                  ...parts[toolPartIdx], 
-                  status: 'success',
-                  result,
-                };
-              }
-              lastMsg.parts = parts;
-              updated[lastIdx] = lastMsg;
-              return updated;
-            });
-          }
-
-          // Add assistant tool calls to history (if not already added by the previous generate step)
-          // NOTE: In the standard flow, the assistant message with toolCalls is added BEFORE we get here.
-          // However, if we are resuming, we need to make sure the flow is correct.
-          // The `apiMessages` passed in should ALREADY contain the assistant message that triggered these tools.
-
-          // Add tool results to history
-          for (const tr of toolResults) {
-            apiMessages.push({
-              role: 'tool',
-              content: tr.content,
-              toolCallId: tr.tool_call_id
-            });
-          }
-
-          // Clear pending calls after execution
-          currentPendingToolCalls = [];
+          // 4. If list is empty (everything was executed in step 2 and stripped), we act as "done with tools"
           
-          // Increment step only after full cycle
+          // Increment step only after full cycle of tools is cleared
           step++;
+          approvedToolIds = []; // Clear whitelist for new step
         }
-
-        // Generate next response (Reasoning + Tool Calls or Final Text)
+        
+        // Generate next response logic...
         console.log(`[Agent Step ${step}] Generating next response...`);
         
         // Create new assistant message placeholder
@@ -466,7 +488,8 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
     const modeConfig = getModeConfig(mode);
     const maxSteps = modeConfig.maxSteps || 5;
 
-    // Build context
+    // Build context logic... (omitted for brevity, same as before)
+    // Redone context logic here to be safe and complete:
     let contextPrefix = '';
     const tableMentions = mentions.filter(m => m.type === 'table');
     if (tableMentions.length > 0) {
@@ -503,12 +526,16 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
         return;
     }
 
-    const { apiMessages, step, maxSteps, pendingToolCalls } = loopStateRef.current;
+    const { apiMessages, step, maxSteps, pendingToolCalls, approvedToolIds } = loopStateRef.current;
+    
+    // Add the confirmed tool ID to approval whitelist
+    const updatedApprovedIds = [...approvedToolIds, pendingConfirmation.toolCallId];
+
     setPendingConfirmation(null);
     setIsLoading(true);
 
-    // Resume loop
-    await runAgentLoop(apiMessages, step, maxSteps, pendingToolCalls);
+    // Resume loop with whitelist
+    await runAgentLoop(apiMessages, step, maxSteps, pendingToolCalls, false, updatedApprovedIds);
 
   }, [pendingConfirmation, runAgentLoop]);
 
@@ -519,16 +546,12 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
         return;
     }
 
-    const { apiMessages, step, maxSteps, pendingToolCalls } = loopStateRef.current;
+    const { apiMessages, step, maxSteps, pendingToolCalls, approvedToolIds } = loopStateRef.current;
     
-    // We need to simulate tool outputs being "Error/Rejected" for ALL pending calls
-    const rejectedToolResults = pendingToolCalls.map(tc => ({
-        tool_call_id: tc.id,
-        role: 'tool' as const,
-        content: JSON.stringify({ error: `User rejected execution: ${reason}` })
-    }));
-
-    // Update UI to show rejection
+    // Identify the specific tool call being rejected
+    const rejectedToolId = pendingConfirmation.toolCallId;
+    
+    // Update UI for the rejected tool ONLY
     setMessages(prev => {
         const updated = [...prev];
         const lastIdx = updated.length - 1;
@@ -537,37 +560,38 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
         const lastMsg = { ...updated[lastIdx] };
         const parts = [...(lastMsg.parts || [])];
         
-        pendingToolCalls.forEach(tc => {
-            const partIdx = parts.findIndex(p => p.type === 'tool-invocation' && p.toolCallId === tc.id);
-            if (partIdx >= 0) {
-                parts[partIdx] = { 
-                    ...parts[partIdx], 
-                    status: 'error', 
-                    result: { error: `Rejected: ${reason}` } 
-                };
-            }
-        });
+        const partIdx = parts.findIndex(p => p.type === 'tool-invocation' && p.toolCallId === rejectedToolId);
+        if (partIdx >= 0) {
+            parts[partIdx] = { 
+                ...parts[partIdx], 
+                status: 'error', 
+                result: { error: `Rejected: ${reason}` } 
+            };
+        }
 
         lastMsg.parts = parts;
         updated[lastIdx] = lastMsg;
         return updated;
     });
 
+    // Add rejection result to history
+    const nextApiMessages = [...apiMessages];
+    nextApiMessages.push({
+        role: 'tool',
+        content: JSON.stringify({ error: `User rejected execution: ${reason}` }),
+        toolCallId: rejectedToolId
+    });
+
+    // Remove the rejected tool from pending execution list
+    const remainingToolCalls = pendingToolCalls.filter(tc => tc.id !== rejectedToolId);
+
     setPendingConfirmation(null);
     setIsLoading(true);
 
-    // Add rejection results to history
-    const nextApiMessages = [...apiMessages];
-    for (const tr of rejectedToolResults) {
-        nextApiMessages.push({
-            role: 'tool',
-            content: tr.content,
-            toolCallId: tr.tool_call_id
-        });
-    }
-
-    // Resume loop so agent can handle the rejection (e.g. apologize or try something else)
-    await runAgentLoop(nextApiMessages, step + 1, maxSteps, []); // Empty pending calls, just generate next response
+    // Resume loop with remaining tools
+    // If there are still pending tools, runAgentLoop will execute them (checking for other confirmations).
+    // If no tools left, it will proceed to next generation step.
+    await runAgentLoop(nextApiMessages, step, maxSteps, remainingToolCalls, false, approvedToolIds);
 
   }, [pendingConfirmation, runAgentLoop]);
 
