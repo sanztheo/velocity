@@ -2,7 +2,7 @@
 // Main AI chat interface container
 
 import { useState, useRef, useEffect } from 'react';
-import { Bot, Key, X } from 'lucide-react';
+import { Key, X } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { useVelocityAgent } from './useVelocityAgent';
@@ -77,7 +77,6 @@ export function ChatPanel({ connectionId }: ChatPanelProps) {
     return (
       <div className="flex flex-col h-full">
         <ChatHeader
-          provider="None"
           onClose={() => setAiPanelOpen(false)}
         />
         
@@ -97,10 +96,9 @@ export function ChatPanel({ connectionId }: ChatPanelProps) {
   }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden relative">
       {/* Header */}
       <ChatHeader
-        provider={agent.currentProvider}
         onClose={() => setAiPanelOpen(false)}
       />
 
@@ -154,24 +152,12 @@ export function ChatPanel({ connectionId }: ChatPanelProps) {
 
 // Header sub-component
 interface ChatHeaderProps {
-  provider: string;
   onClose: () => void;
 }
 
-function ChatHeader({ provider, onClose }: ChatHeaderProps) {
+function ChatHeader({ onClose }: ChatHeaderProps) {
   return (
-    <div className="border-b px-4 py-3 flex items-center justify-between gap-4 bg-background/50 backdrop-blur-sm z-10">
-      <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center shadow-sm">
-          <Bot className="h-4 w-4 text-white" />
-        </div>
-        <div>
-          <h2 className="font-semibold text-sm">Velocity AI</h2>
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
-            {provider}
-          </p>
-        </div>
-      </div>
+    <div className="absolute top-2 right-2 z-10">
       <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 rounded-full opacity-70 hover:opacity-100 hover:bg-muted">
         <X className="h-4 w-4 text-muted-foreground" />
       </Button>
@@ -183,8 +169,8 @@ function ChatHeader({ provider, onClose }: ChatHeaderProps) {
 function EmptyState({ onSuggestionClick }: { onSuggestionClick: (text: string) => void }) {
   return (
     <div className="p-6 text-center">
-      <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-purple-500/20 flex items-center justify-center">
-        <Bot className="h-6 w-6 text-purple-500" />
+      <div className="w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+        <img src="/svg/velocity-ia.svg" className="h-16 w-16" alt="Velocity AI" />
       </div>
       <h3 className="font-medium mb-2">How can I help?</h3>
       <p className="text-sm text-muted-foreground mb-4">
