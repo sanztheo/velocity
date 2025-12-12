@@ -1,4 +1,4 @@
-import { ArrowLeft, Table, Eye, FunctionSquare, MoreVertical, Terminal, Unplug, Plus, Edit, Trash } from "lucide-react";
+import { ArrowLeft, Table, Eye, FunctionSquare, MoreVertical, Terminal, Unplug, Plus, Edit, Trash, Network } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 import {
@@ -21,6 +21,7 @@ interface DatabaseViewProps {
   onNewTable: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onViewERD: () => void;
 }
 
 export function DatabaseView({
@@ -34,6 +35,7 @@ export function DatabaseView({
   onNewTable,
   onEdit,
   onDelete,
+  onViewERD,
 }: DatabaseViewProps) {
   return (
     <div className="flex h-full flex-col">
@@ -62,6 +64,9 @@ export function DatabaseView({
             </DropdownMenuItem>
             <DropdownMenuItem onClick={onNewTable}>
               <Plus className="h-3 w-3 mr-2" /> New Table
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onViewERD}>
+              <Network className="h-3 w-3 mr-2 bg-transparent" /> View Relationships
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onEdit}>

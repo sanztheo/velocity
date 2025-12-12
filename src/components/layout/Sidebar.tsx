@@ -232,6 +232,15 @@ export function Sidebar() {
           onTableClick={handleTableClick}
           onNewQuery={handleNewQuery}
           onNewTable={() => setCreateTableConnectionId(connectedId)}
+          onViewERD={() => {
+            if (!connectedId) return;
+            addTab({
+              id: `erd-${connectedId}`,
+              title: 'Relationship Diagram',
+              type: 'erd',
+              connectionId: connectedId,
+            });
+          }}
           onEdit={() => handleEdit(connectedConnection)}
           onDelete={() => handleDeleteClick(connectedConnection)}
         />
