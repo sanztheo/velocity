@@ -10,7 +10,7 @@ interface ThinkingProcessProps {
   defaultOpen?: boolean;
 }
 
-export function ThinkingProcess({ content, defaultOpen = false }: ThinkingProcessProps) {
+export function ThinkingProcess({ content, defaultOpen = true }: ThinkingProcessProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   if (!content) return null;

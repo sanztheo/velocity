@@ -1,6 +1,6 @@
 import { ArrowLeft, Table, Eye, FunctionSquare, MoreVertical, Terminal, Unplug, Plus, Edit, Trash } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -79,7 +79,8 @@ export function DatabaseView({
       </div>
 
       {/* Tables, Views, Functions */}
-      <ScrollArea className="flex-1">
+      {/* Tables, Views, Functions */}
+      <div className="flex-1 overflow-y-auto min-h-0">
         <div className="p-2 space-y-4">
           {/* Tables Section */}
           {tables.length > 0 && (
@@ -143,7 +144,7 @@ export function DatabaseView({
             </div>
           )}
         </div>
-      </ScrollArea>
+      </div>
     </div>
   );
 }
