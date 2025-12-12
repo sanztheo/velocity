@@ -337,16 +337,16 @@ pub struct DatabaseSchemaInfo {
 /// Get complete database schema for AI agent
 #[tauri::command]
 pub async fn get_database_schema_full(
-    connection_id: String,
+    id: String,
     pool_manager: State<'_, Arc<ConnectionPoolManager>>,
 ) -> Result<DatabaseSchemaInfo, VelocityError> {
     // Get all tables
-    let table_names = pool_manager.list_tables(&connection_id, None, None).await?;
+    let table_names = pool_manager.list_tables(&id, None, None).await?;
     
     // Get schema for each table
     let mut tables = Vec::new();
     for table_name in table_names {
-        match pool_manager.get_table_schema(&connection_id, &table_name).await {
+        match pool_manager.get_table_schema(&id, &table_name).await {
             Ok(columns) => {
                 tables.push(TableSchemaInfo {
                     name: table_name,
@@ -364,10 +364,10 @@ pub async fn get_database_schema_full(
     }
     
     // Get views
-    let views = pool_manager.list_views(&connection_id).await.unwrap_or_default();
+    let views = pool_manager.list_views(&id).await.unwrap_or_default();
     
     // Get functions
-    let functions = pool_manager.list_functions(&connection_id).await.unwrap_or_default();
+    let functions = pool_manager.list_functions(&id).await.unwrap_or_default();
     
     Ok(DatabaseSchemaInfo {
         tables,
@@ -403,21 +403,21 @@ pub async fn preview_create_table(
 #[tauri::command]
 pub async fn execute_ddl(
     app_handle: tauri::AppHandle,
-    connection_id: String,
+    id: String,
     sql: String,
     pool_manager: State<'_, Arc<ConnectionPoolManager>>,
 ) -> Result<(), VelocityError> {
     use tauri::Emitter;
 
     let pool = pool_manager
-        .get_pool(&connection_id)
+        .get_pool(&id)
         .await
         .ok_or_else(|| VelocityError::Connection("Not connected".to_string()))?;
 
     let result = schema_ops::execute_ddl(pool.as_ref(), &sql).await;
     
     if result.is_ok() {
-        let _ = app_handle.emit("database:schema-changed", &connection_id);
+        let _ = app_handle.emit("database:schema-changed", &id);
     }
     
     result
