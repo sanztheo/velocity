@@ -157,7 +157,7 @@ export function ChatInput({
                 {mention.type === 'table' ? <TableIcon className="h-3 w-3" /> : <Globe className="h-3 w-3" />}
                 {mention.value}
                 <X 
-                  className="h-3 w-3 ml-1 cursor-pointer hover:text-foreground" 
+                  className="h-3 w-3 ml-1 cursor-pointer hover:text-foreground pointer-events-auto" 
                   onClick={() => onRemoveMention(mention.value)}
                 />
               </Badge>
