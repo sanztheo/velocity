@@ -234,7 +234,7 @@ export function ChatInput({
                   </Button>
 
                   <ModeSelector mode={mode} onChange={onModeChange} />
-                  <ModelSelector provider={provider} onChange={onProviderChange} />
+                  <ModelSelector provider={provider} mode={mode} onChange={onProviderChange} />
                   
                   {/* Auto-Run Toggle */}
                   <div className="hidden sm:flex items-center gap-1.5 ml-1 pl-1 border-l border-border/40">

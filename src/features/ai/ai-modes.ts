@@ -118,7 +118,7 @@ export const AI_MODE_CONFIGS: Record<AgentModeKey, AIModeConfig> = {
   },
   deep: {
     models: {
-      grok: 'grok-4-1-fast-reasoning',
+      grok: 'grok-3-mini-beta',
       openai: 'o1-mini',
       gemini: 'gemini-2.5-flash-preview-05-20',
     },

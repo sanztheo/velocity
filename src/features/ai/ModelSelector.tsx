@@ -12,30 +12,31 @@ import {
   DropdownMenuTrigger,
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
-import type { AIProvider } from './types';
+import type { AgentMode, AIProvider } from './types';
 import { useAISettingsStore } from './ai-settings.store';
 
 interface ModelSelectorProps {
   provider: AIProvider;
+  mode: AgentMode;
   onChange: (provider: AIProvider) => void;
 }
 
-const PROVIDER_CONFIG = {
+const getProviderConfig = (mode: AgentMode) => ({
   grok: {
-    label: 'Grok 4.1 Fast',
-    description: 'Fastest reasoning & performance',
+    label: mode === 'deep' ? 'Grok 3 Mini' : 'Grok 4.1 Fast',
+    description: mode === 'deep' ? 'Visible reasoning step-by-step' : 'Fastest reasoning & performance',
   },
   openai: {
-    label: 'GPT-4o',
-    description: 'Reliable general intelligence',
+    label: mode === 'deep' ? 'o1-mini' : 'GPT-4o',
+    description: mode === 'deep' ? 'Complex reasoning model' : 'Reliable general intelligence',
   },
   gemini: {
-    label: 'Gemini 2.0 Flash',
-    description: 'Large context & speed',
+    label: mode === 'deep' ? 'Gemini 2.5 Flash Preview' : 'Gemini 2.0 Flash',
+    description: mode === 'deep' ? 'Experimental thinking model' : 'Large context & speed',
   },
-};
+});
 
-export function ModelSelector({ provider, onChange }: ModelSelectorProps) {
+export function ModelSelector({ provider, mode, onChange }: ModelSelectorProps) {
   const [open, setOpen] = useState(false);
   const settings = useAISettingsStore();
   const { envKeysStatus, grokApiKey, openaiApiKey, geminiApiKey } = settings;
@@ -45,7 +46,8 @@ export function ModelSelector({ provider, onChange }: ModelSelectorProps) {
   const isOpenAiAvailable = !!(openaiApiKey || envKeysStatus?.openaiAvailable);
   const isGeminiAvailable = !!(geminiApiKey || envKeysStatus?.geminiAvailable);
 
-  const currentConfig = PROVIDER_CONFIG[provider];
+  const providerConfig = getProviderConfig(mode);
+  const currentConfig = providerConfig[provider];
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
@@ -64,7 +66,7 @@ export function ModelSelector({ provider, onChange }: ModelSelectorProps) {
           Select Model
         </DropdownMenuLabel>
         
-        {Object.entries(PROVIDER_CONFIG).map(([key, config]) => {
+        {Object.entries(providerConfig).map(([key, config]) => {
           const providerKey = key as AIProvider;
           const isAvailable = 
             providerKey === 'grok' ? isGrokAvailable :
