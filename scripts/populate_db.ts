@@ -117,6 +117,23 @@ async function main() {
         await client.query(`INSERT INTO order_items (order_id, product_id, quantity, price) VALUES ${itemsValues.join(',')}`);
     }
 
+    // Create Thousands of Tables
+    console.log('Creating 2,000 extra dummy tables...');
+    for (let i = 0; i < 2000; i++) {
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS dummy_table_${i} (
+                id SERIAL PRIMARY KEY,
+                data_1 VARCHAR(100),
+                data_2 INT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+        // Optional: Insert one row to make it not completely empty
+        if (i % 10 === 0) { // Insert data in 10% of them to be faster
+             await client.query(`INSERT INTO dummy_table_${i} (data_1, data_2) VALUES ('Dummy Data ${i}', ${i * 10})`);
+        }
+    }
+
     await client.query('COMMIT');
     console.log('Database populated successfully!');
   } catch (e) {

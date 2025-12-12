@@ -122,19 +122,7 @@ export const useAppStore = create<AppState>()(
       
       toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
       
-      setTheme: (theme) => {
-        const root = window.document.documentElement;
-        root.classList.remove('light', 'dark');
-        
-        if (theme === 'system') {
-          const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-          root.classList.add(systemTheme);
-        } else {
-          root.classList.add(theme);
-        }
-        
-        return { theme };
-      },
+      setTheme: (theme) => set({ theme }),
       
       setAiPanelOpen: (open) => set({ aiPanelOpen: open }),
       
