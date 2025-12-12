@@ -3,6 +3,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Key, X } from 'lucide-react';
+import { VelocityLogo } from "@/components/icons/VelocityLogo";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { useVelocityAgent } from './useVelocityAgent';
@@ -170,7 +171,7 @@ function EmptyState({ onSuggestionClick }: { onSuggestionClick: (text: string) =
   return (
     <div className="p-6 text-center">
       <div className="w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-        <img src="/svg/velocity-ia.svg" className="h-16 w-16" alt="Velocity AI" />
+        <VelocityLogo className="h-16 w-16" />
       </div>
       <h3 className="font-medium mb-2">How can I help?</h3>
       <p className="text-sm text-muted-foreground mb-4">

@@ -6,6 +6,7 @@ import {
 import { useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ImperativePanelHandle } from "react-resizable-panels";
+import { VelocityLogo } from "@/components/icons/VelocityLogo";
 import { Sidebar } from "./Sidebar";
 import { TabBar } from "./TabBar";
 import { useAppStore } from "@/stores/app.store";
@@ -89,7 +90,7 @@ export function AppLayout({
                   disabled={!activeConnectionId}
                   className="gap-2"
                 >
-                  <img src="/svg/velocity-ia.svg" className="h-6 w-6" alt="IA" />
+                  <VelocityLogo className="h-8 w-8" />
                   <span className="hidden sm:inline">IA Velocity</span>
                 </Button>
               </div>
