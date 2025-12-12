@@ -26,6 +26,9 @@ interface ConnectionState {
   tables: string[];
   views: string[];
   functions: string[];
+  tablesOffset: number;
+  hasMoreTables: boolean;
+  isLoadingMore: boolean;
 }
 
 export function Sidebar() {
@@ -36,7 +39,14 @@ export function Sidebar() {
   // Single connected connection
   const [connectedId, setConnectedId] = useState<string | null>(activeConnectionId);
   const [connectingId, setConnectingId] = useState<string | null>(null);
-  const [connectionData, setConnectionData] = useState<ConnectionState>({ tables: [], views: [], functions: [] });
+  const [connectionData, setConnectionData] = useState<ConnectionState>({ 
+    tables: [], 
+    views: [], 
+    functions: [], 
+    tablesOffset: 0, 
+    hasMoreTables: true,
+    isLoadingMore: false
+  });
   
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -72,14 +82,21 @@ export function Sidebar() {
           const views = results[1].status === 'fulfilled' ? results[1].value : [];
           const functions = results[2].status === 'fulfilled' ? results[2].value : [];
           
-          setConnectionData({ tables, views, functions });
+          setConnectionData({ 
+            tables, 
+            views, 
+            functions, 
+            tablesOffset: 0, 
+            hasMoreTables: tables.length === 100,
+            isLoadingMore: false
+          });
         } catch (e) {
             // silent fail
         }
       };
       fetchData();
     }
-  }, [connectedId, connectionData.tables.length]);
+  }, [connectedId]); // Removed connectionData.tables.length dependency to avoid loops, explicit loads only
 
   const handleConnect = async (conn: Connection) => {
     // If already connected to this one, do nothing
@@ -111,7 +128,14 @@ export function Sidebar() {
       const views = results[1].status === 'fulfilled' ? results[1].value : [];
       const functions = results[2].status === 'fulfilled' ? results[2].value : [];
       
-      setConnectionData({ tables, views, functions });
+      setConnectionData({ 
+        tables, 
+        views, 
+        functions, 
+        tablesOffset: 0, 
+        hasMoreTables: tables.length === 100,
+        isLoadingMore: false
+      });
       setConnectedId(conn.id);
       setActiveConnection(conn.id);
       toast.success(`Connected to ${conn.name}`);
@@ -135,7 +159,7 @@ export function Sidebar() {
     }
     
     setConnectedId(null);
-    setConnectionData({ tables: [], views: [], functions: [] });
+    setConnectionData({ tables: [], views: [], functions: [], tablesOffset: 0, hasMoreTables: true, isLoadingMore: false });
     
     // Close all tabs associated with this connection
     useAppStore.getState().closeTabsForConnection(connectedId);
@@ -199,12 +223,44 @@ export function Sidebar() {
     setEditingConnection(null);
   };
 
+  // Auto-fetch subsequent chunks if there are more tables
+  useEffect(() => {
+    if (connectedId && connectionData.hasMoreTables && connectionData.tables.length > 0) {
+      const timer = setTimeout(() => {
+        handleLoadMoreTables();
+      }, 50); // Small delay to keep UI responsive
+      
+      return () => clearTimeout(timer);
+    }
+  }, [connectedId, connectionData.tables.length, connectionData.hasMoreTables]);
+
+  const handleLoadMoreTables = async () => {
+    if (!connectedId || !connectionData.hasMoreTables || connectionData.isLoadingMore) return;
+
+    setConnectionData(prev => ({ ...prev, isLoadingMore: true }));
+
+    try {
+      const nextOffset = connectionData.tablesOffset + 100;
+      const newTables = await listTables(connectedId, 100, nextOffset);
+      
+      setConnectionData(prev => ({
+        ...prev,
+        tables: [...prev.tables, ...newTables],
+        tablesOffset: nextOffset,
+        hasMoreTables: newTables.length === 100,
+        isLoadingMore: false
+      }));
+    } catch {
+      setConnectionData(prev => ({ ...prev, isLoadingMore: false }));
+    }
+  };
+
   const refreshTables = async () => {
     if (!connectedId) return;
     
     try {
       const tables = await listTables(connectedId, 100, 0);
-      setConnectionData(prev => ({ ...prev, tables }));
+      setConnectionData(prev => ({ ...prev, tables, tablesOffset: 0, hasMoreTables: tables.length === 100, isLoadingMore: false }));
     } catch {
       // Ignore
     }
@@ -239,6 +295,8 @@ export function Sidebar() {
             tables={connectionData.tables}
             views={connectionData.views}
             functions={connectionData.functions}
+            hasMoreTables={connectionData.hasMoreTables}
+            onLoadMoreTables={handleLoadMoreTables}
             onBack={handleDisconnect}
             onTableClick={handleTableClick}
             onNewQuery={handleNewQuery}

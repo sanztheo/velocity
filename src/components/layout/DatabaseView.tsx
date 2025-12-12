@@ -1,4 +1,5 @@
-import { ArrowLeft, Table, Eye, FunctionSquare, MoreVertical, Terminal, Unplug, Plus, Edit, Trash, Network } from "lucide-react";
+import { ArrowLeft, Table, Eye, FunctionSquare, MoreVertical, Terminal, Unplug, Plus, Edit, Trash, Network, Loader2 } from "lucide-react";
+import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 
 import {
@@ -15,6 +16,8 @@ interface DatabaseViewProps {
   tables: string[];
   views: string[];
   functions: string[];
+  hasMoreTables?: boolean;
+  onLoadMoreTables?: () => void;
   onBack: () => void;
   onTableClick: (tableName: string) => void;
   onNewQuery: () => void;
@@ -29,6 +32,8 @@ export function DatabaseView({
   tables,
   views,
   functions,
+  hasMoreTables = false,
+  onLoadMoreTables,
   onBack,
   onTableClick,
   onNewQuery,
@@ -37,6 +42,27 @@ export function DatabaseView({
   onDelete,
   onViewERD,
 }: DatabaseViewProps) {
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!onLoadMoreTables || !hasMoreTables) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          onLoadMoreTables();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (loadMoreRef.current) {
+      observer.observe(loadMoreRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [onLoadMoreTables, hasMoreTables, tables.length]);
+
   return (
     <div className="flex h-full flex-col">
       {/* Header with back button */}
@@ -84,7 +110,6 @@ export function DatabaseView({
       </div>
 
       {/* Tables, Views, Functions */}
-      {/* Tables, Views, Functions */}
       <div className="flex-1 overflow-y-auto min-h-0">
         <div className="p-2 space-y-2">
           {/* Tables Section */}
@@ -103,6 +128,12 @@ export function DatabaseView({
                   <span className="truncate text-muted-foreground group-hover:text-foreground transition-colors">{table}</span>
                 </button>
               ))}
+              
+              {hasMoreTables && (
+                <div ref={loadMoreRef} className="flex justify-center p-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                </div>
+              )}
             </div>
           )}
 
