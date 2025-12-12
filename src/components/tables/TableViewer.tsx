@@ -39,18 +39,29 @@ export function TableViewer({ connectionId, tableName }: TableViewerProps) {
   // Table editor state
   const editor = useTableEditor(primaryKeyColumn);
 
-  // Column widths (based on data type)
+  // Column widths (based on data type and name length)
   const columnWidths = useMemo(() => {
-    return schema.map(col => {
-      const type = col.dataType.toLowerCase();
-      if (type.includes('text') || type.includes('varchar')) return 200;
-      if (type.includes('uuid')) return 280;
-      if (type.includes('timestamp')) return 180;
-      if (type.includes('bool')) return 80;
-      if (type.includes('int') || type.includes('numeric')) return 100;
-      return 150;
+    // Use data columns if available to ensure alignment, otherwise fallback to schema
+    const targetColumns = data?.columns || schema.map(c => c.name);
+    
+    return targetColumns.map(colName => {
+      const col = schema.find(s => s.name === colName);
+      const type = col?.dataType.toLowerCase() || 'text';
+      
+      let width = 150; // default
+      
+      if (type.includes('text') || type.includes('varchar')) width = 200;
+      else if (type.includes('uuid')) width = 280;
+      else if (type.includes('timestamp')) width = 180;
+      else if (type.includes('bool')) width = 100; // Increased base for bool
+      else if (type.includes('int') || type.includes('numeric')) width = 120;
+      
+      // Ensure width is enough for column name (approx 10px per char + liberal padding)
+      // "autocompletesettingsenabled" is ~27 chars -> 270 + 40 = 310px.
+      const nameWidth = (colName.length * 11) + 48; 
+      return Math.max(width, nameWidth);
     });
-  }, [schema]);
+  }, [schema, data]);
 
   // Virtual rows
   const rowVirtualizer = useVirtualizer({
