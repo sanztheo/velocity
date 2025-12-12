@@ -112,6 +112,19 @@ function parseValue(inputValue: string, dataType: string, originalValue: unknown
   return inputValue;
 }
 
+function getSuggestionsForType(dataType: string, inputValue: string): string[] {
+  const type = dataType.toLowerCase();
+  const input = inputValue.toLowerCase();
+  const suggestions: string[] = [];
+
+  if (type.includes('bool')) {
+    if ('true'.startsWith(input)) suggestions.push('true');
+    if ('false'.startsWith(input)) suggestions.push('false');
+  }
+
+  return suggestions;
+}
+
 export function EditableCell({
   value,
   column: _column,
@@ -125,18 +138,67 @@ export function EditableCell({
   onNavigate,
 }: EditableCellProps) {
   const [inputValue, setInputValue] = useState('');
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   
   // Initialize input value when editing starts
   useEffect(() => {
     if (isEditing) {
-      setInputValue(value === null ? '' : String(value));
+      const initialVal = value === null ? '' : String(value);
+      setInputValue(initialVal);
+      // Generate initial suggestions
+      setSuggestions(getSuggestionsForType(dataType, initialVal));
+      setSelectedSuggestionIndex(0);
+      
       // Focus after a small delay to ensure DOM is ready
       setTimeout(() => inputRef.current?.focus(), 0);
     }
-  }, [isEditing, value]);
+  }, [isEditing, value, dataType]); // Added dataType dependency
+
+  // Update suggestions when input changes
+  useEffect(() => {
+    if (isEditing) {
+      const newSuggestions = getSuggestionsForType(dataType, inputValue);
+      setSuggestions(newSuggestions);
+      setSelectedSuggestionIndex(prev => Math.min(prev, Math.max(0, newSuggestions.length - 1)));
+    }
+  }, [inputValue, isEditing, dataType]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (suggestions.length > 0) {
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedSuggestionIndex(prev => (prev > 0 ? prev - 1 : suggestions.length - 1));
+        return;
+      }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedSuggestionIndex(prev => (prev < suggestions.length - 1 ? prev + 1 : 0));
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+          // If we have a suggestion selected and it's not just a generic enter/tab handling
+          // But wait, Enter usually saves. If we are navigating suggestions, Enter should pick the suggestion.
+          if (suggestions.length > 0) {
+              e.preventDefault();
+              const selectedValue = suggestions[selectedSuggestionIndex];
+              // Update input to the selected suggestion
+              setInputValue(selectedValue);
+              // We want to save, but maybe just setting input value is enough for the next generic 'Enter' press?
+              // Or should we save immediately? 
+              // Standard behavior: Enter picks suggestion if list is open, then next Enter saves.
+              // But here inline editing usually commits on Enter.
+              // Let's make it commit immediately with the suggested value.
+              onSave(parseValue(selectedValue, dataType, value));
+              if (e.key === 'Tab') {
+                   onNavigate(e.shiftKey ? 'left' : 'right');
+              }
+              return;
+          }
+      }
+    }
+
     switch (e.key) {
       case 'Enter':
         onSave(parseValue(inputValue, dataType, value));
@@ -150,14 +212,14 @@ export function EditableCell({
         onNavigate(e.shiftKey ? 'left' : 'right');
         break;
       case 'ArrowUp':
-        if (e.altKey) {
+        if (e.altKey && suggestions.length === 0) { // Only standard nav if no suggestions or Alt used
           e.preventDefault();
           onSave(parseValue(inputValue, dataType, value));
           onNavigate('up');
         }
         break;
       case 'ArrowDown':
-        if (e.altKey) {
+        if (e.altKey && suggestions.length === 0) { // Only standard nav if no suggestions or Alt used
           e.preventDefault();
           onSave(parseValue(inputValue, dataType, value));
           onNavigate('down');
@@ -168,15 +230,41 @@ export function EditableCell({
 
   if (isEditing) {
     return (
-      <Input
-        ref={inputRef}
-        value={inputValue}
-        onChange={(e) => setInputValue(e.target.value)}
-        onKeyDown={handleKeyDown}
-        onBlur={() => onSave(parseValue(inputValue, dataType, value))}
-        className="h-7 px-1 py-0 text-sm font-mono border-primary"
-        autoFocus
-      />
+      <div className="relative">
+        <Input
+          ref={inputRef}
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onBlur={() => {
+              // Delay save to allow clicking suggestions if we added click handlers later
+              // For now standard blur save
+              onSave(parseValue(inputValue, dataType, value));
+          }}
+          className="h-7 px-1 py-0 text-sm font-mono border-primary"
+          autoFocus // Technically redundant with the useEffect focus, but good backup
+        />
+        {suggestions.length > 0 && (
+          <div className="absolute z-50 w-full min-w-[100px] mt-1 bg-popover text-popover-foreground border rounded-md shadow-md overflow-hidden">
+             {suggestions.map((suggestion, index) => (
+               <div
+                 key={suggestion}
+                 className={cn(
+                   "px-2 py-1 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground",
+                   index === selectedSuggestionIndex && "bg-accent text-accent-foreground"
+                 )}
+                 onMouseDown={(e) => {
+                     e.preventDefault(); // Prevent input blur
+                     setInputValue(suggestion);
+                     onSave(parseValue(suggestion, dataType, value));
+                 }}
+               >
+                 {suggestion}
+               </div>
+             ))}
+          </div>
+        )}
+      </div>
     );
   }
 
