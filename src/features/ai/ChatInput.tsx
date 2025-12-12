@@ -156,10 +156,24 @@ export function ChatInput({
               >
                 {mention.type === 'table' ? <TableIcon className="h-3 w-3" /> : <Globe className="h-3 w-3" />}
                 {mention.value}
-                <X 
-                  className="h-3 w-3 ml-1 cursor-pointer hover:text-foreground pointer-events-auto" 
-                  onClick={() => onRemoveMention(mention.value)}
-                />
+                <div
+                  role="button"
+                  tabIndex={0}
+                  className="ml-1 cursor-pointer hover:text-foreground pointer-events-auto flex items-center justify-center p-0.5 rounded-full hover:bg-background/20" 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemoveMention(mention.value);
+                  }}
+                  onKeyDown={(e) => {
+                     if(e.key === "Enter" || e.key === " "){
+                         e.preventDefault();
+                         e.stopPropagation();
+                         onRemoveMention(mention.value);
+                     }
+                  }}
+                >
+                  <X className="h-3 w-3" />
+                </div>
               </Badge>
             ))}
           </div>
