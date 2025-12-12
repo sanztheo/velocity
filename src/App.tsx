@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { ModeToggle } from "@/components/mode-toggle";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useAppStore } from "@/stores/app.store";
 import { Toaster } from "@/components/ui/sonner";
@@ -66,6 +67,9 @@ function App() {
               <p className="text-muted-foreground">
                 Press <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">⌘K</kbd> to search, or double-click a connection
               </p>
+              <div className="mt-4">
+                <ModeToggle />
+              </div>
             </div>
           </div>
         )}
