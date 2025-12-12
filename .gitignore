@@ -11,6 +11,8 @@ dist/
 dist-ssr/
 *.local
 
+design.html
+
 # Tauri build artifacts
 src-tauri/target/
 src-tauri/gen/schemas/

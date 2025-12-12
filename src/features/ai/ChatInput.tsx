@@ -2,8 +2,10 @@
 // Input area for sending messages to the AI with @ mention support
 
 import { useRef, useEffect, useState, useCallback } from 'react';
-import { StopCircle, Plus, ArrowRight, X } from 'lucide-react';
+import { StopCircle, Plus, ArrowRight, X, Table as TableIcon, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { cn } from '@/lib/utils';
 import { ModeSelector } from './ModeSelector';
 import { ModelSelector } from './ModelSelector';
@@ -30,6 +32,7 @@ interface ChatInputProps {
   onAddMention: (mention: Mention) => void;
   onRemoveMention: (value: string) => void;
   availableTables: string[];
+  className?: string;
 }
 
 export function ChatInput({
@@ -50,12 +53,14 @@ export function ChatInput({
   onAddMention,
   onRemoveMention,
   availableTables,
+  className,
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [showMentionDropdown, setShowMentionDropdown] = useState(false);
   const [mentionQuery, setMentionQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [mentionStartPos, setMentionStartPos] = useState<number | null>(null);
+  const [isFocused, setIsFocused] = useState(false);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -139,152 +144,121 @@ export function ChatInput({
   };
 
   return (
-    <div className="flex flex-col gap-0 w-full">
-      {/* 
-        Note: The design.html has a top bar (files, terminal, etc.) - we are skipping that for now 
-        as it's likely part of the parent container or context bar, we focus on the Input Block 
-      */}
+    <div className={cn("flex flex-col gap-0 w-full p-2 pt-0 pb-2", className)}>
+      {/* Mention Dropdown */}
+      {mentions.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-2 px-1">
+            {mentions.map((mention, index) => (
+              <Badge 
+                key={index}
+                variant="secondary"
+                className="flex items-center gap-1 bg-muted/50 hover:bg-muted text-xs font-normal"
+              >
+                {mention.type === 'table' ? <TableIcon className="h-3 w-3" /> : <Globe className="h-3 w-3" />}
+                {mention.value}
+                <X 
+                  className="h-3 w-3 ml-1 cursor-pointer hover:text-foreground" 
+                  onClick={() => onRemoveMention(mention.value)}
+                />
+              </Badge>
+            ))}
+          </div>
+      )}
 
-      {/* Main Input Container - Matching the 'design.html' structure */}
+      {/* Main Input Container - Matching the 'design.html' structure (Row Layout) */}
       <div className={cn(
-        "flex flex-col gap-0 rounded-lg border bg-muted/30 transition-all duration-200",
-        "focus-within:border-ring/50 focus-within:ring-1 focus-within:ring-ring/50",
-        "hover:border-border/80"
+        "group flex flex-col rounded-lg border bg-muted/30 transition-all duration-200 p-2",
+        isFocused ? "border-primary/50 bg-muted/40 shadow-sm" : "border-border",
+        disabled && "opacity-50 cursor-not-allowed",
+        className
       )}>
         
-        {/* Input Area */}
-        <div className="relative p-2 pb-0">
-          
-          {/* Mention Chips - Rendered above text or floating? 
-              Design has them inline or hidden. We keep them above for now to show context. 
-          */}
-          {mentions.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mb-2 px-1">
-              {mentions.map(mention => (
-                <div
-                  key={`${mention.type}-${mention.value}`}
-                  className={cn(
-                    "flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
-                    mention.type === 'web' 
-                      ? "bg-blue-500/10 text-blue-500" 
-                      : "bg-primary/10 text-primary"
-                  )}
-                >
-                  <span>{mention.displayName}</span>
-                  <button
-                    onClick={() => onRemoveMention(mention.value)}
-                    className="hover:bg-black/10 rounded-full p-0.5"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ))}
+        <div className="flex flex-row items-end gap-2">
+          {/* Left Column: Input + Toolbar */}
+          <div className="flex-1 flex flex-col gap-2 min-w-0">
+            {/* Textarea */}
+            <div className="relative">
+              <textarea
+                ref={textareaRef}
+                value={value}
+                onChange={(e) => handleInputChange(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onFocus={() => setIsFocused(true)}
+                onBlur={() => setIsFocused(false)}
+                placeholder={placeholder}
+                disabled={disabled || isLoading} // Keep isLoading for disabling
+                rows={1}
+                className="w-full resize-none bg-transparent px-2 py-1 sm:text-sm text-[13px] placeholder:text-muted-foreground/50 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed min-h-[48px] max-h-[300px]"
+                style={{ minHeight: '48px' }}
+              />
+              
+              {/* Mention Dropdown Positioned relative to textarea */}
+              <MentionDropdown
+                isOpen={showMentionDropdown}
+                searchQuery={mentionQuery}
+                tables={availableTables}
+                onSelect={handleSelectMention}
+                onClose={() => setShowMentionDropdown(false)}
+                selectedIndex={selectedIndex}
+              />
             </div>
-          )}
 
-          <textarea
-            ref={textareaRef}
-            value={value}
-            onChange={(e) => handleInputChange(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={placeholder}
-            disabled={disabled || isLoading}
-            rows={1}
-            className={cn(
-              "w-full resize-none bg-transparent px-1 py-1 sm:text-sm text-[13px]",
-              "placeholder:text-muted-foreground/50 focus:outline-none",
-              "disabled:opacity-50 disabled:cursor-not-allowed",
-              "min-h-[48px] max-h-[300px]" 
-            )}
-            style={{ minHeight: '48px' }}
-          />
-          
-          {/* Mention Dropdown */}
-          <MentionDropdown
-            isOpen={showMentionDropdown}
-            searchQuery={mentionQuery}
-            tables={availableTables}
-            onSelect={handleSelectMention}
-            onClose={() => setShowMentionDropdown(false)}
-            selectedIndex={selectedIndex}
-          />
-        </div>
+            {/* Bottom Toolbar (Inside Left Column) */}
+            <div className="flex w-full items-center justify-between gap-1">
+                <div className="flex min-w-0 items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 rounded-md opacity-60 hover:bg-muted-foreground/10 hover:opacity-100 shrink-0"
+                    onClick={() => {
+                        onChange(value + '@');
+                        textareaRef.current?.focus();
+                    }}
+                    title="Add context (@)"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
 
-        {/* Toolbar - Bottom Section */}
-        <div className="flex w-full items-center justify-between gap-1 p-2 pt-0">
-          
-          {/* Left Side: Context & Config */}
-          <div className="flex min-w-0 items-center gap-1">
-            
-            {/* Context Add Button */}
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-6 w-6 rounded-md opacity-60 hover:bg-muted-foreground/10 hover:opacity-100 shrink-0"
-              title="Add context (@)"
-              onClick={() => {
-                onChange(value + '@');
-                textareaRef.current?.focus();
-              }}
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
-
-            {/* Separator - slight spacing */}
-            <div className="w-1" />
-
-            {/* Mode Selector */}
-            <ModeSelector mode={mode} onChange={onModeChange} />
-
-            {/* Model Selector */}
-            <ModelSelector provider={provider} onChange={onProviderChange} />
-            
-            {/* Auto-Accept Toggle (Hidden in design.html but useful functionality, kept minimal) */}
-            {autoAccept && (
-               <Button
-                variant="ghost" 
-                size="sm"
-                onClick={() => onAutoAcceptChange(!autoAccept)}
-                className="h-6 px-1.5 text-[10px] gap-1 rounded-md bg-red-500/10 text-red-500 hover:bg-red-500/20"
-                title="Auto-Run Enabled"
-              >
-                <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                <span className="truncate">Auto</span>
-              </Button>
-            )}
+                  <ModeSelector mode={mode} onChange={onModeChange} />
+                  <ModelSelector provider={provider} onChange={onProviderChange} />
+                  
+                  {/* Auto-Run Toggle */}
+                  <div className="hidden sm:flex items-center gap-1.5 ml-1 pl-1 border-l border-border/40">
+                     <Switch 
+                        id="auto-run" 
+                        checked={autoAccept} 
+                        onCheckedChange={onAutoAcceptChange}
+                        className="h-3.5 w-6 data-[state=checked]:bg-primary/50"
+                     />
+                     <label htmlFor="auto-run" className="text-[10px] text-muted-foreground cursor-pointer select-none">Auto-run</label>
+                  </div>
+                </div>
+            </div>
           </div>
 
-          {/* Right Side: Send/Stop Button */}
+          {/* Right Column: Send Button */}
           <div className="shrink-0">
-            {isLoading ? (
-              <Button
-                onClick={onStop}
-                variant="destructive"
-                size="icon"
-                className="h-7 w-7 rounded-full shadow-sm" // Rounded full for stop too? Or kept square? Design shows Send as square-ish in some IDEs or round. User said "same design". Design.html uses generic button. I'll make it rounded-lg to match snippet button style or rounded-full for modern feel. Stick to rounded-lg for consistency with snippet unless 'rounded-full' was explicitly requested. User plan approval mentioned 'rounded-full'.
-              >
-                <StopCircle className="h-3.5 w-3.5" />
-              </Button>
-            ) : (
-              <Button
-                onClick={handleSubmit}
-                disabled={!value.trim() || disabled}
+             <Button 
+                onClick={isLoading ? onStop : onSubmit}
+                disabled={(!value.trim() && !isLoading) || disabled}
                 size="icon"
                 className={cn(
-                  "h-7 w-7 rounded-full shadow-sm transition-all", // Keeping rounded-sm or lg? Design snippet has `rounded-full` in my plan proposal which user approved.
-                  value.trim() 
-                    ? "bg-primary text-primary-foreground hover:bg-primary/90" 
-                    : "bg-muted text-muted-foreground hover:bg-muted/80 opacity-50"
+                  "h-8 w-8 rounded-full shadow-sm transition-all",
+                  isLoading 
+                    ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" 
+                    : "bg-primary text-primary-foreground hover:bg-primary/90",
+                  (!value.trim() && !isLoading) && "opacity-50 bg-muted text-muted-foreground hover:bg-muted/80"
                 )}
               >
-                <ArrowRight className="h-4 w-4 stroke-[2]" />
+                {isLoading ? (
+                  <StopCircle className="h-4 w-4" />
+                ) : (
+                  <ArrowRight className="h-4 w-4 stroke-[2]" />
+                )}
               </Button>
-            )}
-            {/* Reverting to rounded-lg / rounded-md based on plan? "Use rounded-full for the Send button." Okay. */}
           </div>
         </div>
       </div>
     </div>
   );
 }
-

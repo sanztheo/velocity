@@ -353,7 +353,7 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
         channel.onmessage = (chunk: AiChatChunk) => {
              if (chunk.type === 'toolCall') {
             newToolCalls.push({
-              id: chunk.id || `tool-${Date.now()}`,
+              id: chunk.id || `tool-${Date.now()}-${Math.random().toString(36).slice(2)}`,
               name: chunk.name || 'unknown',
               args: chunk.arguments ? JSON.parse(chunk.arguments) : {},
             });
