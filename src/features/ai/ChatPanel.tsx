@@ -33,6 +33,28 @@ export function ChatPanel({ connectionId }: ChatPanelProps) {
     }
   }, [agent.messages]);
 
+  // Auto-refresh tables on successful schema mutation
+  useEffect(() => {
+    const lastMsg = agent.messages[agent.messages.length - 1];
+    if (!lastMsg || lastMsg.role !== 'assistant') return;
+    
+    const hasSuccessfulMutation = lastMsg.parts?.some(p => 
+      p.type === 'tool-invocation' && 
+      p.status === 'success' && 
+      (p.toolName === 'execute_ddl' || 
+       p.toolName === 'create_table' || 
+       (p.toolName === 'run_sql_query' && p.args?.sql && typeof p.args.sql === 'string' && 
+        (p.args.sql.toUpperCase().includes('CREATE') || 
+         p.args.sql.toUpperCase().includes('DROP') || 
+         p.args.sql.toUpperCase().includes('ALTER'))))
+    );
+
+    if (hasSuccessfulMutation) {
+      console.log('[ChatPanel] Mutation detected, refreshing tables...');
+      mentions.refreshTables();
+    }
+  }, [agent.messages, mentions.refreshTables]);
+
   const handleSubmit = async () => {
     if (!agent.input.trim()) return;
     const input = agent.input;

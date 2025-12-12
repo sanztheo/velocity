@@ -139,39 +139,49 @@ export function ChatInput({
   };
 
   return (
-    <div className="p-4 bg-background border-t">
+    <div className="flex flex-col gap-0 w-full">
+      {/* 
+        Note: The design.html has a top bar (files, terminal, etc.) - we are skipping that for now 
+        as it's likely part of the parent container or context bar, we focus on the Input Block 
+      */}
+
+      {/* Main Input Container - Matching the 'design.html' structure */}
       <div className={cn(
-        "flex flex-col gap-0 rounded-xl border border-border/50 bg-muted/20 p-3",
-        "focus-within:ring-1 focus-within:ring-ring/50 focus-within:border-ring/50 transition-all duration-200"
+        "flex flex-col gap-0 rounded-lg border bg-muted/30 transition-all duration-200",
+        "focus-within:border-ring/50 focus-within:ring-1 focus-within:ring-ring/50",
+        "hover:border-border/80"
       )}>
         
-        {/* Mention Chips */}
-        {mentions.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mb-2">
-            {mentions.map(mention => (
-              <div
-                key={`${mention.type}-${mention.value}`}
-                className={cn(
-                  "flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
-                  mention.type === 'web' 
-                    ? "bg-blue-500/10 text-blue-500" 
-                    : "bg-primary/10 text-primary"
-                )}
-              >
-                <span>{mention.displayName}</span>
-                <button
-                  onClick={() => onRemoveMention(mention.value)}
-                  className="hover:bg-black/10 rounded-full p-0.5"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
         {/* Input Area */}
-        <div className="relative">
+        <div className="relative p-2 pb-0">
+          
+          {/* Mention Chips - Rendered above text or floating? 
+              Design has them inline or hidden. We keep them above for now to show context. 
+          */}
+          {mentions.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-2 px-1">
+              {mentions.map(mention => (
+                <div
+                  key={`${mention.type}-${mention.value}`}
+                  className={cn(
+                    "flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
+                    mention.type === 'web' 
+                      ? "bg-blue-500/10 text-blue-500" 
+                      : "bg-primary/10 text-primary"
+                  )}
+                >
+                  <span>{mention.displayName}</span>
+                  <button
+                    onClick={() => onRemoveMention(mention.value)}
+                    className="hover:bg-black/10 rounded-full p-0.5"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           <textarea
             ref={textareaRef}
             value={value}
@@ -184,7 +194,7 @@ export function ChatInput({
               "w-full resize-none bg-transparent px-1 py-1 sm:text-sm text-[13px]",
               "placeholder:text-muted-foreground/50 focus:outline-none",
               "disabled:opacity-50 disabled:cursor-not-allowed",
-              "min-h-[48px] max-h-[300px] pb-3" 
+              "min-h-[48px] max-h-[300px]" 
             )}
             style={{ minHeight: '48px' }}
           />
@@ -200,14 +210,17 @@ export function ChatInput({
           />
         </div>
 
-        <div className="flex w-full items-center justify-between gap-2 mt-0">
-          <div className="flex min-w-0 items-center gap-0.5">
+        {/* Toolbar - Bottom Section */}
+        <div className="flex w-full items-center justify-between gap-1 p-2 pt-0">
+          
+          {/* Left Side: Context & Config */}
+          <div className="flex min-w-0 items-center gap-1">
             
             {/* Context Add Button */}
             <Button 
               variant="ghost" 
               size="icon" 
-              className="h-7 w-7 rounded-lg opacity-70 hover:bg-muted/50 hover:opacity-100 shrink-0"
+              className="h-6 w-6 rounded-md opacity-60 hover:bg-muted-foreground/10 hover:opacity-100 shrink-0"
               title="Add context (@)"
               onClick={() => {
                 onChange(value + '@');
@@ -217,43 +230,38 @@ export function ChatInput({
               <Plus className="h-4 w-4" />
             </Button>
 
+            {/* Separator - slight spacing */}
+            <div className="w-1" />
+
             {/* Mode Selector */}
             <ModeSelector mode={mode} onChange={onModeChange} />
 
             {/* Model Selector */}
             <ModelSelector provider={provider} onChange={onProviderChange} />
             
-            <div className="w-px h-4 bg-border/50 mx-1 shrink-0" />
-
-            {/* Auto-Accept Toggle */}
-            <Button
-              variant="ghost" 
-              size="sm"
-              onClick={() => onAutoAcceptChange(!autoAccept)}
-              className={cn(
-                "h-7 px-2 text-[11px] gap-1.5 font-medium rounded-lg transition-colors shrink-0",
-                autoAccept 
-                  ? "bg-red-500/10 text-red-500 hover:bg-red-500/20" 
-                  : "text-muted-foreground hover:bg-muted/50"
-              )}
-              title={autoAccept ? "Auto-execute SQL (Dangerous)" : "Ask for confirmation"}
-            >
-              <div className={cn(
-                "w-1.5 h-1.5 rounded-full",
-                autoAccept ? "bg-red-500" : "bg-muted-foreground/50"
-              )} />
-              <span className="truncate">Auto-Run</span>
-            </Button>
+            {/* Auto-Accept Toggle (Hidden in design.html but useful functionality, kept minimal) */}
+            {autoAccept && (
+               <Button
+                variant="ghost" 
+                size="sm"
+                onClick={() => onAutoAcceptChange(!autoAccept)}
+                className="h-6 px-1.5 text-[10px] gap-1 rounded-md bg-red-500/10 text-red-500 hover:bg-red-500/20"
+                title="Auto-Run Enabled"
+              >
+                <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                <span className="truncate">Auto</span>
+              </Button>
+            )}
           </div>
 
-          {/* Send/Stop Button */}
+          {/* Right Side: Send/Stop Button */}
           <div className="shrink-0">
             {isLoading ? (
               <Button
                 onClick={onStop}
                 variant="destructive"
                 size="icon"
-                className="h-7 w-7 rounded-lg transition-all"
+                className="h-7 w-7 rounded-full shadow-sm" // Rounded full for stop too? Or kept square? Design shows Send as square-ish in some IDEs or round. User said "same design". Design.html uses generic button. I'll make it rounded-lg to match snippet button style or rounded-full for modern feel. Stick to rounded-lg for consistency with snippet unless 'rounded-full' was explicitly requested. User plan approval mentioned 'rounded-full'.
               >
                 <StopCircle className="h-3.5 w-3.5" />
               </Button>
@@ -263,18 +271,20 @@ export function ChatInput({
                 disabled={!value.trim() || disabled}
                 size="icon"
                 className={cn(
-                  "h-7 w-7 rounded-lg transition-all shadow-sm",
+                  "h-7 w-7 rounded-full shadow-sm transition-all", // Keeping rounded-sm or lg? Design snippet has `rounded-full` in my plan proposal which user approved.
                   value.trim() 
                     ? "bg-primary text-primary-foreground hover:bg-primary/90" 
                     : "bg-muted text-muted-foreground hover:bg-muted/80 opacity-50"
                 )}
               >
-                <ArrowRight className="h-3.5 w-3.5 stroke-[2.5]" />
+                <ArrowRight className="h-4 w-4 stroke-[2]" />
               </Button>
             )}
+            {/* Reverting to rounded-lg / rounded-md based on plan? "Use rounded-full for the Send button." Okay. */}
           </div>
         </div>
       </div>
     </div>
   );
 }
+
