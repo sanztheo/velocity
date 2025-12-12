@@ -11,7 +11,7 @@ import { ChatPanel } from "@/features/ai";
 import { PerformanceMonitor } from "@/components/PerformanceMonitor";
 
 function App() {
-  const { theme, activeTabId, tabs, aiPanelOpen, setAiPanelOpen, activeConnectionId } = useAppStore();
+  const { theme, activeTabId, tabs, aiPanelOpen, activeConnectionId } = useAppStore();
 
   useEffect(() => {
     // Apply theme to document
