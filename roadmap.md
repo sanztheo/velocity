@@ -116,12 +116,12 @@
 
 | Fonctionnalité           | TablePlus | Status | Notes        |
 | ------------------------ | --------- | ------ | ------------ |
-| Aperçu SQL avant apply   | ✅        | ❌     |              |
+| Aperçu SQL avant apply   | ✅        | ✅     | Implémenté   |
 | Transactions explicites  | ✅        | ❌     |              |
-| Rollback en cas d'erreur | ✅        | ❌     |              |
+| Rollback en cas d'erreur | ✅        | ✅     | Auto-rollback|
 | Confirmation delete      | ✅        | ✅     | Dialog       |
-| Read-only mode           | ✅        | ❌     |              |
-| Timeout requêtes         | ✅        | ❌     | Configurable |
+| Read-only mode           | ✅        | ✅     | Configurable |
+| Timeout requêtes         | ✅        | ✅     | Configurable |
 
 #### 🎨 UX et Productivité
 
@@ -151,9 +151,9 @@
 | Filtrage        | 1       | 0           | 8          |
 | Structure       | 1       | 0           | 6          |
 | Import/Export   | 0       | 0           | 7          |
-| Sécurité        | 1       | 0           | 5          |
+| Sécurité        | 5       | 0           | 1          |
 | UX              | 8       | 1           | 3          |
-| **TOTAL**       | **54**  | **1**       | **30**     |
+| **TOTAL**       | **58**  | **1**       | **26**     |
 
 ### 6.3 Fonctionnalités Velocity Uniques (différenciation)
 

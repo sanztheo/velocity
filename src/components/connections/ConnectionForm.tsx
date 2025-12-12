@@ -41,6 +41,8 @@ const formSchema = z.object({
   url: z.string().optional(),
   ssl: z.boolean().default(false),
   favorite: z.boolean().default(false),
+  readOnly: z.boolean().default(false),
+  timeoutSeconds: z.string().optional().transform(val => val ? parseInt(val, 10) : undefined),
   // SQL Server specific
   encrypt: z.boolean().default(false),
   trustServerCertificate: z.boolean().default(true),
@@ -142,6 +144,8 @@ export function ConnectionForm({ connection, onSuccess, onCancel }: ConnectionFo
       url: "",
       ssl: false,
       favorite: false,
+      readOnly: false,
+      timeoutSeconds: undefined,
     },
   });
 
@@ -160,6 +164,8 @@ export function ConnectionForm({ connection, onSuccess, onCancel }: ConnectionFo
         url: "",
         ssl: connection.config.ssl?.enabled || false,
         favorite: connection.favorite,
+        readOnly: connection.readOnly || false,
+        timeoutSeconds: connection.timeoutSeconds?.toString() || "",
       });
     } else {
       form.reset({
@@ -174,6 +180,8 @@ export function ConnectionForm({ connection, onSuccess, onCancel }: ConnectionFo
         url: "",
         ssl: false,
         favorite: false,
+        readOnly: false,
+        timeoutSeconds: "",
       });
     }
   }, [connection, form]);
@@ -250,6 +258,8 @@ export function ConnectionForm({ connection, onSuccess, onCancel }: ConnectionFo
         favorite: values.favorite,
         createdAt: connection?.createdAt || new Date().toISOString(),
         lastUsedAt: connection?.lastUsedAt,
+        readOnly: values.readOnly,
+        timeoutSeconds: values.timeoutSeconds,
       };
 
       await save.mutateAsync(newConnection);
@@ -534,6 +544,53 @@ export function ConnectionForm({ connection, onSuccess, onCancel }: ConnectionFo
                 )}
               </>
             )}
+
+            {/* General Settings Section */}
+            <div className="pt-4 border-t border-border mt-4">
+              <h4 className="text-sm font-medium mb-3">Security & Advanced</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control as any}
+                  name="readOnly"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border border-border p-4 bg-secondary/50">
+                      <FormControl>
+                        <Checkbox
+                          checked={!!field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel>Read Only Mode</FormLabel>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Prevent any write operations
+                        </p>
+                      </div>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control as any}
+                  name="timeoutSeconds"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Query Timeout (sec)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="60"
+                          {...field}
+                          value={field.value || ''}
+                          className="bg-secondary border-border"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
           </TabsContent>
         </Tabs>
         
@@ -583,6 +640,8 @@ export function ConnectionForm({ connection, onSuccess, onCancel }: ConnectionFo
                   config,
                   favorite: false,
                   createdAt: new Date().toISOString(),
+                  readOnly: values.readOnly,
+                  timeoutSeconds: values.timeoutSeconds,
                 };
                 
                 await testConnection(testConn);
