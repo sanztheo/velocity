@@ -44,6 +44,8 @@ export interface Connection {
   color?: string;
   lastUsedAt?: string;
   createdAt: string;
+  readOnly?: boolean;
+  timeoutSeconds?: number;
 }
 
 export type TabType = 'query' | 'table' | 'structure' | 'erd';

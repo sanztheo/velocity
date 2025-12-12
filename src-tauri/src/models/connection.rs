@@ -13,6 +13,10 @@ pub struct Connection {
     pub color: Option<String>,
     pub last_used_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
+    #[serde(default)]
+    pub read_only: bool,
+    #[serde(default)]
+    pub timeout_seconds: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
