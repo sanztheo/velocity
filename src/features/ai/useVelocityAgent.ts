@@ -25,7 +25,7 @@ export interface MessagePart {
   toolCallId?: string;
   args?: Record<string, unknown>;
   result?: unknown;
-  status?: 'pending' | 'executing' | 'success' | 'error';
+  status?: 'pending' | 'executing' | 'success' | 'error' | 'awaiting-confirmation';
 }
 
 // Chunk types from Rust backend
@@ -196,6 +196,24 @@ export function useVelocityAgent({ connectionId, mode }: UseVelocityAgentOptions
 
           if (destructiveCall && !settings.autoAcceptSql) {
             console.log('[Agent] Pausing for confirmation:', destructiveCall);
+            
+            // Update UI status to awaiting-confirmation
+            setMessages(prev => {
+              const updated = [...prev];
+              const lastIdx = updated.length - 1;
+              if (lastIdx < 0) return prev;
+              
+              const lastMsg = { ...updated[lastIdx] };
+              const parts = [...(lastMsg.parts || [])];
+              const toolPartIdx = parts.findIndex(p => p.type === 'tool-invocation' && p.toolCallId === destructiveCall.id);
+              if (toolPartIdx >= 0) {
+                parts[toolPartIdx] = { ...parts[toolPartIdx], status: 'awaiting-confirmation' };
+              }
+              lastMsg.parts = parts;
+              updated[lastIdx] = lastMsg;
+              return updated;
+            });
+
             // Save state to resume later
             loopStateRef.current = {
               apiMessages,

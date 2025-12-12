@@ -11,9 +11,11 @@ import type { ChatMessage, MessagePart } from './useVelocityAgent';
 
 interface MessageBubbleProps {
   message: ChatMessage;
+  onConfirm?: () => Promise<void>;
+  onReject?: (reason: string) => Promise<void>;
 }
 
-export function MessageBubble({ message }: MessageBubbleProps) {
+export function MessageBubble({ message, onConfirm, onReject }: MessageBubbleProps) {
   const isUser = message.role === 'user';
   const parts = message.parts || [];
   const hasPartsToRender = parts.length > 0;
@@ -94,6 +96,8 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                 args={part.args || {}}
                 status={part.status || 'pending'}
                 result={part.result}
+                onConfirm={onConfirm}
+                onReject={onReject}
               />
             );
           }

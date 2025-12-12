@@ -1,8 +1,11 @@
 // ToolInvocation Component
 // Displays tool call status, arguments, and results
 
-import { Loader2, CheckCircle, XCircle, Clock, Database, Search, FileCode } from 'lucide-react';
+import { useState } from 'react';
+import { Loader2, CheckCircle, XCircle, Clock, Database, Search, FileCode, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
 type ToolStatus = 'pending' | 'awaiting-confirmation' | 'executing' | 'success' | 'error';
@@ -13,6 +16,8 @@ interface ToolInvocationProps {
   status: ToolStatus;
   result?: unknown;
   error?: string;
+  onConfirm?: () => Promise<void>;
+  onReject?: (reason: string) => Promise<void>;
 }
 
 const TOOL_ICONS: Record<string, typeof Database> = {
@@ -30,7 +35,7 @@ const STATUS_CONFIG = {
   },
   'awaiting-confirmation': {
     icon: Clock,
-    label: 'Awaiting Confirmation',
+    label: 'Confirmation Required',
     color: 'text-yellow-500',
     animate: false,
   },
@@ -54,10 +59,13 @@ const STATUS_CONFIG = {
   },
 };
 
-export function ToolInvocation({ toolName, args, status, result, error }: ToolInvocationProps) {
+export function ToolInvocation({ toolName, args, status, result, error, onConfirm, onReject }: ToolInvocationProps) {
   const statusConfig = STATUS_CONFIG[status];
   const StatusIcon = statusConfig.icon;
   const ToolIcon = TOOL_ICONS[toolName] || FileCode;
+  
+  const [rejectReason, setRejectReason] = useState('');
+  const [isActionLoading, setIsActionLoading] = useState(false);
 
   const formatToolName = (name: string) => {
     return name
@@ -72,12 +80,37 @@ export function ToolInvocation({ toolName, args, status, result, error }: ToolIn
     }
     return str;
   };
+  
   const hasArgs = args && Object.keys(args).length > 0;
   const hasResult = status === 'success' && result !== undefined;
   const hasError = status === 'error' && error;
+  const isAwaitingConfirmation = status === 'awaiting-confirmation';
+
+  const handleConfirm = async () => {
+    if (!onConfirm) return;
+    setIsActionLoading(true);
+    try {
+        await onConfirm();
+    } finally {
+        setIsActionLoading(false);
+    }
+  };
+
+  const handleReject = async () => {
+    if (!onReject) return;
+    setIsActionLoading(true);
+    try {
+        await onReject(rejectReason || 'User rejected via UI');
+    } finally {
+        setIsActionLoading(false);
+    }
+  };
 
   return (
-    <div className="border rounded-lg p-3 mb-3 bg-background/50">
+    <div className={cn(
+      "border rounded-lg p-3 mb-3 bg-background/50",
+      isAwaitingConfirmation && "border-yellow-500/50 bg-yellow-500/5"
+    )}>
       <div className="flex items-center gap-2 mb-2">
         <StatusIcon 
           className={cn(
@@ -90,7 +123,7 @@ export function ToolInvocation({ toolName, args, status, result, error }: ToolIn
         <Badge variant="outline" className="font-mono text-xs">
           {formatToolName(toolName)}
         </Badge>
-        <span className={cn("text-xs ml-auto", statusConfig.color)}>
+        <span className={cn("text-xs ml-auto font-medium", statusConfig.color)}>
           {statusConfig.label}
         </span>
       </div>
@@ -100,10 +133,50 @@ export function ToolInvocation({ toolName, args, status, result, error }: ToolIn
         <div className="mb-2">
           <span className="text-xs text-muted-foreground block mb-1">Arguments:</span>
           <pre className="text-xs bg-muted p-2 rounded whitespace-pre-wrap break-all font-mono">
-            {JSON.stringify(args, null, 2)}
+            {typeof args.sql === 'string' ? args.sql : JSON.stringify(args, null, 2)}
           </pre>
         </div>
       ) : null}
+      
+      {/* Confirmation UI */}
+      {isAwaitingConfirmation && (
+        <div className="mt-3 pt-3 border-t border-yellow-500/20">
+          <div className="flex items-start gap-2 mb-3">
+             <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5" />
+             <div className="text-xs text-yellow-600/90">
+                This action modifies the database. Please review the SQL above.
+             </div>
+          </div>
+          
+          <div className="flex gap-2">
+            <div className="flex-1">
+                 <Input 
+                    placeholder="Reason (optional)..." 
+                    value={rejectReason}
+                    onChange={(e) => setRejectReason(e.target.value)}
+                    className="h-8 text-xs bg-background/50"
+                 />
+            </div>
+            <Button 
+                size="sm" 
+                variant="destructive" 
+                onClick={handleReject}
+                disabled={isActionLoading}
+                className="h-8 px-3"
+            >
+                Reject
+            </Button>
+            <Button 
+                size="sm" 
+                onClick={handleConfirm}
+                disabled={isActionLoading}
+                className="h-8 px-3 bg-blue-600 hover:bg-blue-700 text-white"
+            >
+                Accept
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Result */}
       {hasResult ? (
@@ -119,7 +192,7 @@ export function ToolInvocation({ toolName, args, status, result, error }: ToolIn
 
       {/* Error */}
       {hasError ? (
-        <div className="mt-2 text-xs text-red-500 bg-red-500/10 p-2 rounded">
+        <div className="mt-2 text-xs text-red-500 bg-red-500/10 p-2 rounded border border-red-500/20">
           {error}
         </div>
       ) : null}

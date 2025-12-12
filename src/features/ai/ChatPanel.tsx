@@ -10,7 +10,6 @@ import { useAISettingsStore } from './ai-settings.store';
 import { useAppStore } from '@/stores/app.store';
 import { MessageBubble } from './MessageBubble';
 import { ChatInput } from './ChatInput';
-import { ConfirmationPanel } from './ConfirmationPanel';
 import { useMentions } from './useMentions';
 import type { AgentMode } from './types';
 
@@ -85,7 +84,12 @@ export function ChatPanel({ connectionId }: ChatPanelProps) {
           <EmptyState />
         ) : (
           agent.messages.map((message) => (
-            <MessageBubble key={message.id} message={message} />
+            <MessageBubble 
+              key={message.id} 
+              message={message} 
+              onConfirm={() => agent.confirmSql()}
+              onReject={(reason) => agent.rejectSql(reason)}
+            />
           ))
         )}
 
@@ -97,14 +101,7 @@ export function ChatPanel({ connectionId }: ChatPanelProps) {
         )}
       </ScrollArea>
 
-      {/* Confirmation panel (when waiting for approval) */}
-      {agent.pendingConfirmation && (
-        <ConfirmationPanel
-          confirmation={agent.pendingConfirmation}
-          onConfirm={agent.confirmSql}
-          onReject={agent.rejectSql}
-        />
-      )}
+      {/* Confirmation panel removed - now inline */}
 
       {/* Input */}
       <ChatInput
