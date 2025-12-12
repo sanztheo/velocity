@@ -32,8 +32,7 @@ export function SortableHeader({
       )}
     >
       <span>{label || column}</span>
-      <span className="ml-auto">
-        {direction === 'asc' ? (
+      <span>{direction === 'asc' ? (
           <ChevronUp className="h-4 w-4 text-primary" />
         ) : direction === 'desc' ? (
           <ChevronDown className="h-4 w-4 text-primary" />
