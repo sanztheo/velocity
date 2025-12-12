@@ -87,18 +87,16 @@ export function DatabaseView({
               <div className="px-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
                 Tables ({tables.length})
               </div>
-              <div className="max-h-full overflow-y-auto pr-1">
-                {tables.map((table) => (
-                  <button
-                    key={table}
-                    className="flex items-center gap-2 w-full text-left text-sm px-2 py-1.5 rounded hover:bg-sidebar-hover transition-colors"
-                    onClick={() => onTableClick(table)}
-                  >
-                    <Table className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                    <span className="truncate">{table}</span>
-                  </button>
-                ))}
-              </div>
+              {tables.map((table) => (
+                <button
+                  key={table}
+                  className="flex items-center gap-2 w-full text-left text-sm px-2 py-1.5 rounded hover:bg-sidebar-hover transition-colors"
+                  onClick={() => onTableClick(table)}
+                >
+                  <Table className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <span className="truncate">{table}</span>
+                </button>
+              ))}
             </div>
           )}
 
